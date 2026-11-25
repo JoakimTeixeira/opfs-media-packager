@@ -111,7 +111,7 @@ test("should keep reusable modules independent of extension entry points", async
   ]);
 
   for (const name of await readdir(root)) {
-    if (!name.endsWith(".ts")) continue;
+    if (!name.endsWith(".ts") || name.endsWith(".test.ts")) continue;
     const source = await readFile(new URL(name, root), "utf8");
 
     const file = ts.createSourceFile(

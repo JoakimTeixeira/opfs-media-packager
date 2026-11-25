@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createProbeSandbox } from "./fixtures/page-playlist-probe-sandbox.ts";
+import { createProbeSandbox } from "./mocks/page-playlist-probe-sandbox.ts";
 
 test("shares rate-limit pacing (max 1 in-flight), Retry-After backoff, and 2-strike 429 circuit breaker across sidebar course adapters", async () => {
   const attempts = new Map<string, number>();

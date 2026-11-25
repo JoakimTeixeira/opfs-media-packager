@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { compiledProbeScript } from "./fixtures/page-playlist-probe-fixtures.ts";
-import { createProbeSandbox } from "./fixtures/page-playlist-probe-sandbox.ts";
+import { compiledProbeScript } from "./mocks/page-playlist-probe-fixtures.ts";
+import { createProbeSandbox } from "./mocks/page-playlist-probe-sandbox.ts";
 
 test("remains idempotent when re-executed via chrome.scripting.executeScript", () => {
   const sandbox = createProbeSandbox({

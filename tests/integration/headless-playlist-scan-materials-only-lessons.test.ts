@@ -4,7 +4,7 @@ import {
   harness,
   makeApiLessons,
   extSender,
-} from "./fixtures/headless-playlist-scan-setup.ts";
+} from "./mocks/headless-playlist-scan-setup.ts";
 
 test("open-course-download includes materials-only and subtitle-only lessons in default all mode", async () => {
   harness.reset();

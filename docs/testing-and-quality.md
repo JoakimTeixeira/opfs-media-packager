@@ -16,7 +16,7 @@ New or changed test names should start with `should` and describe one observable
 
 The test pyramid keeps most tests fast at the unit layer. Integration and browser tests cover the connections that unit tests cannot observe. Mutation testing checks whether the tests would catch common implementation mistakes.
 
-The `tests/unit/`, `tests/integration/`, and `tests/e2e/` directories contain those three layers. `tests/contract/` checks packaging, security, and documentation agreements, while `tests/architecture/` checks dependency boundaries. Shared integration and browser fixtures live in each layer's `fixtures/` directory. Coverage and mutation runs use these existing tests rather than a separate test layer.
+Unit tests sit beside their modules in `lib/`. Cross-module tests live in `tests/integration/`, and browser flows live in `tests/e2e/`. `tests/contract/` checks packaging, security, and documentation agreements, while `tests/architecture/` checks dependency boundaries. Integration mocks live in `tests/integration/mocks/`, and browser fixtures live in `tests/e2e/fixtures/`. Coverage and mutation runs use these existing tests rather than a separate test layer.
 
 ## Test techniques and intent
 
@@ -52,7 +52,7 @@ The `tests/unit/`, `tests/integration/`, and `tests/e2e/` directories contain th
 
 - Keep test files at or below 400 physical lines, including blank lines and comments. ESLint enforces the limit for test and spec files.
 - Group unit tests by the module they exercise and name scenario files after the behaviour they cover.
-- Extract shared mocks and large fixtures into the relevant layer's `fixtures/` directory. Keep test cases independent so the runner can execute test files in parallel.
+- Extract shared mocks and large fixtures into clearly named helpers near their tests. Keep test cases independent so the runner can execute test files in parallel.
 - Start with a focused test around the rule that needs to change. This creates a safe seam in existing code before refactoring.
 - Assert visible behaviour and meaningful state. Avoid asserting private implementation details unless they enforce a security or browser contract.
 - Use local fake servers for network cases. They make authorization, rate-limit, retry, and timeout behaviour repeatable.
@@ -82,7 +82,7 @@ The lint configuration also enforces the Object Calisthenics profile used by thi
 
 For a review, start with `npm run verify`. Run `npm run test:mutation` when core rules, security boundaries, queue transitions, or retry behaviour change. Keep the command output or continuous-integration record with the release evidence.
 
-Coverage thresholds apply to `lib/**/*.ts` only. They do not measure `app.ts`, `background.ts`, or `page-playlist-probe.ts`. Mutation testing covers the modules explicitly listed in [stryker.config.mjs](../stryker.config.mjs). Passing a coverage threshold or a mutation run does not prove that every behaviour is correct.
+Coverage thresholds apply to production modules in `lib/`, excluding colocated test files. They do not measure `app.ts`, `background.ts`, or `page-playlist-probe.ts`. Mutation testing covers the modules explicitly listed in [stryker.config.mjs](../stryker.config.mjs). Passing a coverage threshold or a mutation run does not prove that every behaviour is correct.
 
 The current browser suite uses local test media and simulated sites. It does not establish compatibility with every real site or prove audio and video synchronization across every player. When modifying packaging, inspect a representative output file and record the media format, duration and subtitle behaviour.
 

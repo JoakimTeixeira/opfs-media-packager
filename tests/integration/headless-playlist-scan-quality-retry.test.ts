@@ -6,13 +6,13 @@ import {
   stringField,
   probeLessons,
   EXT_ID,
-} from "./fixtures/headless-playlist-scan-types.ts";
-import { realSetTimeout } from "./fixtures/headless-playlist-scan-harness.ts";
+} from "./mocks/headless-playlist-scan-types.ts";
+import { realSetTimeout } from "./mocks/headless-playlist-scan-harness.ts";
 import {
   harness,
   extSender,
   waitForScanReady,
-} from "./fixtures/headless-playlist-scan-setup.ts";
+} from "./mocks/headless-playlist-scan-setup.ts";
 
 test("Tier 1.5 preserves all 3 quality options across wildcard-CORS credentials:omit retry and trailing rendition playlist", async () => {
   harness.reset();

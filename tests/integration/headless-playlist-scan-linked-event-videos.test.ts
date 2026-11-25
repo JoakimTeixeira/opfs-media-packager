@@ -1,14 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  stringField,
-  EXT_ID,
-} from "./fixtures/headless-playlist-scan-types.ts";
+import { stringField, EXT_ID } from "./mocks/headless-playlist-scan-types.ts";
 import {
   harness,
   extSender,
   waitForScanReady,
-} from "./fixtures/headless-playlist-scan-setup.ts";
+} from "./mocks/headless-playlist-scan-setup.ts";
 
 test("Tier 1.5 captures 2 direct MP4 event recordings linked from a primary-HLS lesson, extracts Trix materials, and enforces strict 1-hop depth", async () => {
   harness.reset();

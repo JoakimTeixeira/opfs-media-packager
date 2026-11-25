@@ -4,7 +4,7 @@ This guide helps a contributor locate the code and verify changes to OPFS Media 
 
 ## Find the owning code
 
-The project root contains the browser entry points. The [architecture map](project-map.md) identifies each entry point and its responsibility. Reusable rules are in [`lib/`](../lib/). Automated checks are in [`tests/`](../tests/): unit tests, integration tests, browser flows, contracts, and architecture checks each have their own directory.
+The project root contains the browser entry points. The [architecture map](project-map.md) identifies each entry point and its responsibility. Reusable rules and their unit tests are in [`lib/`](../lib/). Cross-module checks are in [`tests/`](../tests/), grouped into integration tests, browser flows, contracts, and architecture checks.
 
 | Change                          | Where to start                                                                     | Evidence to find or add                                             |
 | ------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------- |

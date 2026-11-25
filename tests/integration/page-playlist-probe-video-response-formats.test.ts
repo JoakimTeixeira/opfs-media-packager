@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { encodeDeflatedEnvelope } from "./fixtures/page-playlist-probe-fixtures.ts";
-import { createProbeSandbox } from "./fixtures/page-playlist-probe-sandbox.ts";
+import { encodeDeflatedEnvelope } from "./mocks/page-playlist-probe-fixtures.ts";
+import { createProbeSandbox } from "./mocks/page-playlist-probe-sandbox.ts";
 
 test("decodes non-[7,12] video tipo values and rejects HTTP 200 SPA HTML fallbacks as unresolved", async () => {
   const sandbox = createProbeSandbox({

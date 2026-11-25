@@ -138,15 +138,16 @@ export default [
     },
   },
   {
-    files: ["tests/**/*.ts", "scripts/**/*.ts"],
+    files: ["tests/**/*.ts", "scripts/**/*.ts", "lib/**/*.test.ts"],
     rules: {
       "sonarjs/no-identical-functions": "off",
     },
   },
   {
-    files: ["tests/**/*.test.ts", "tests/**/*.spec.ts"],
+    files: ["**/*.test.ts", "**/*.spec.ts"],
     rules: {
       "max-lines": ["error", { max: 400 }],
+      complexity: "off",
     },
   },
   // Disables ESLint rules that conflict with Prettier formatting

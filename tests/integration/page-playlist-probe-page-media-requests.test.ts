@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fromVmRealm } from "./fixtures/page-playlist-probe-fixtures.ts";
-import { createProbeSandbox } from "./fixtures/page-playlist-probe-sandbox.ts";
+import { fromVmRealm } from "./mocks/page-playlist-probe-fixtures.ts";
+import { createProbeSandbox } from "./mocks/page-playlist-probe-sandbox.ts";
 
 test("fetchMediaFromPage allows subtitle and /media_transcripts paths with appropriate credentials", async () => {
   const fetchCalls: { url: string; credentials?: RequestCredentials }[] = [];

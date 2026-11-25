@@ -6,7 +6,8 @@
     "page-playlist-probe.ts",
     "popup.ts",
     "scripts/*.ts",
-    "tests/**/*.ts"
+    "tests/**/*.ts",
+    "lib/**/*.test.ts"
   ],
   "project": ["*.ts", "lib/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"],
   "ignoreDependencies": ["@stryker-mutator/api"]

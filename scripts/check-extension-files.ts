@@ -11,6 +11,10 @@ interface ExtensionManifest {
   readonly content_scripts?: readonly ManifestContentScript[];
 }
 
+interface BundleSourceMap {
+  readonly sources: readonly string[];
+}
+
 const pages = ["popup.html", "index.html", "playlist.html"] as const;
 
 const manifest = JSON.parse(
@@ -40,8 +44,46 @@ for (const script of scripts) {
   if (!existsSync(script)) missing.push(`manifest.json -> ${script}`);
 }
 
+const bundles = [
+  "app",
+  "background",
+  "content",
+  "page-playlist-probe",
+  "playlist",
+  "popup",
+];
+
+const testSources: string[] = [];
+
+for (const bundle of bundles) {
+  const mapPath = `dist/${bundle}.js.map`;
+
+  const sourceMap = JSON.parse(
+    readFileSync(mapPath, "utf8"),
+  ) as BundleSourceMap;
+
+  for (const source of sourceMap.sources) {
+    const normalized = source.replaceAll("\\", "/");
+
+    if (
+      /(?:^|\/)(?:tests|mocks|__mocks__)(?:\/|$)/.test(normalized) ||
+      /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(normalized)
+    ) {
+      testSources.push(`${mapPath} -> ${source}`);
+    }
+  }
+}
+
 if (missing.length > 0) {
   console.error(`Missing extension files:\n${missing.join("\n")}`);
+  process.exit(1);
+}
+
+if (testSources.length > 0) {
+  console.error(
+    `Test sources included in extension bundles:\n${testSources.join("\n")}`,
+  );
+
   process.exit(1);
 }
 

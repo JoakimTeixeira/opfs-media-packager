@@ -5,13 +5,13 @@ import {
   EXT_ID,
   stringField,
   probeLessons,
-} from "./fixtures/headless-playlist-scan-types.ts";
+} from "./mocks/headless-playlist-scan-types.ts";
 import {
   harness,
   makeApiLessons,
   extSender,
   waitForScanReady,
-} from "./fixtures/headless-playlist-scan-setup.ts";
+} from "./mocks/headless-playlist-scan-setup.ts";
 
 test("Tier 1 headless scan resolves all 35 lessons with 0 tabs/windows, retries CORS omit for subtitles, and maps generic Subtitle to language", async () => {
   harness.reset();

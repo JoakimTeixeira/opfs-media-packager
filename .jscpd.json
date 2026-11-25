@@ -11,7 +11,10 @@
     "**/tests/**",
     "**/reports/**",
     "**/test-results/**",
-    "**/.stryker-tmp/**"
+    "**/.stryker-tmp/**",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/__mocks__/**"
   ],
   "format": ["typescript", "javascript"]
 }
