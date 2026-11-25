@@ -1,0 +1,77 @@
+{
+  "version": 2,
+  "skills": {
+    "tlc-spec-driven": {
+      "name": "tlc-spec-driven",
+      "source": "local",
+      "contentHash": "e8c2380a57817ef2406da1977668a39ba7721bdcb5c430fb87f2f82d6b34ae18",
+      "installedAt": "2026-11-25T07:40:21.833Z",
+      "updatedAt": "2026-11-25T07:40:21.833Z",
+      "agents": [
+        "github-copilot"
+      ],
+      "method": "copy",
+      "global": false
+    },
+    "the-fool": {
+      "name": "the-fool",
+      "source": "local",
+      "contentHash": "4468f89ea05bfdea7a9346bebae5358bcf80ff4a51e6f59195b7312186fe0718",
+      "installedAt": "2026-11-25T07:40:38.926Z",
+      "updatedAt": "2026-11-25T07:40:38.926Z",
+      "agents": [
+        "github-copilot"
+      ],
+      "method": "copy",
+      "global": false
+    },
+    "the-jury": {
+      "name": "the-jury",
+      "source": "local",
+      "contentHash": "04b3931496ca41463620a960aee92babac280987d7621a9ab80f7d9ee158d229",
+      "installedAt": "2026-11-25T07:40:44.626Z",
+      "updatedAt": "2026-11-25T07:40:44.626Z",
+      "agents": [
+        "github-copilot"
+      ],
+      "method": "copy",
+      "global": false
+    },
+    "skill-architect": {
+      "name": "skill-architect",
+      "source": "local",
+      "contentHash": "349b256153447631c3ed356996c3a62fec52493d07ba75e37b12c458f9fbf6bb",
+      "installedAt": "2026-11-25T07:40:50.281Z",
+      "updatedAt": "2026-11-25T07:40:50.281Z",
+      "agents": [
+        "github-copilot"
+      ],
+      "method": "copy",
+      "global": false
+    },
+    "skill-validator": {
+      "name": "skill-validator",
+      "source": "local",
+      "contentHash": "06bf2d854235274c29e2d1e3db7fcb63b6204a2d75468957d054eb463b87b12d",
+      "installedAt": "2026-11-25T07:40:56.028Z",
+      "updatedAt": "2026-11-25T07:40:56.028Z",
+      "agents": [
+        "github-copilot"
+      ],
+      "method": "copy",
+      "global": false
+    },
+    "subagent-creator": {
+      "name": "subagent-creator",
+      "source": "local",
+      "contentHash": "bef6b5a9f23b3186af259c1041c2561e9af15fa94810009d72d775bb217aa3ca",
+      "installedAt": "2026-11-25T07:41:01.673Z",
+      "updatedAt": "2026-11-25T07:41:01.673Z",
+      "agents": [
+        "github-copilot"
+      ],
+      "method": "copy",
+      "global": false
+    }
+  }
+}
