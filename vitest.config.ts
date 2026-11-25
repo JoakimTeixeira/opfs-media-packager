@@ -8,7 +8,7 @@ export default defineConfig({
       provider: "v8",
       include: ["lib/**/*.ts"],
       exclude: ["lib/**/*.test.ts", "**/__fixtures__/**", "**/__mocks__/**"],
-      reporter: ["text"],
+      reporter: ["text", "json-summary"],
       thresholds: { lines: 100, branches: 96, functions: 97 },
     },
   },

@@ -1,3 +1,4 @@
+import { waitForBrowserDownload } from "./browser-download.ts";
 import {
   errorMessageOf,
   isAbortError,
@@ -1017,56 +1018,6 @@ async function subtitleText(
     .join("\n");
 
   return repairDoubleEncodedUtf8(joined);
-}
-
-async function waitForBrowserDownload(
-  downloadId: number,
-  signal?: AbortSignal,
-): Promise<chrome.downloads.DownloadItem | chrome.downloads.DownloadDelta> {
-  if (signal?.aborted) {
-    chrome.downloads.cancel(downloadId).catch(() => {});
-    throw new DOMException("Download cancelled", "AbortError");
-  }
-
-  const [existing] = await chrome.downloads.search({ id: downloadId });
-
-  if (existing?.state === "complete") return existing;
-
-  if (existing?.state === "interrupted") {
-    throw new Error("Chrome interrupted the file download.");
-  }
-
-  return new Promise((resolve, reject) => {
-    const settle = (finish: () => void): void => {
-      chrome.downloads.onChanged.removeListener(listener);
-      signal?.removeEventListener("abort", onAbort);
-      finish();
-    };
-
-    const onAbort = (): void => {
-      chrome.downloads.cancel(downloadId).catch(() => {});
-
-      settle(() =>
-        reject(new DOMException("Download cancelled", "AbortError")),
-      );
-    };
-
-    const listener = (delta: chrome.downloads.DownloadDelta): void => {
-      if (delta.id !== downloadId || !delta.state) return;
-      if (delta.state.current === "in_progress") return;
-
-      if (delta.state.current === "complete") {
-        settle(() => resolve(delta));
-
-        return;
-      }
-
-      settle(() => reject(new Error("Chrome interrupted the file download.")));
-    };
-
-    signal?.addEventListener("abort", onAbort, { once: true });
-    chrome.downloads.onChanged.addListener(listener);
-  });
 }
 
 async function runRegisteredBrowserDownload(

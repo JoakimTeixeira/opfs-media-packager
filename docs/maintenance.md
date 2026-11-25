@@ -32,9 +32,15 @@ Search for the named responsibility or behaviour within these folders. Run the r
 
 Run `npm ci`, `npm run build`, then the checks in [testing-and-quality.md](testing-and-quality.md). Run `npm run test:mutation` separately. Record the exact command and result in the change description.
 
+The current harness scan is L4 at 105/105. The read-only change verifier is available as both a Copilot custom agent and an OpenCode subagent.
+
 For a reported regression, add a test that reproduces the user-visible behaviour before changing the implementation. Use fictional URLs and remove access tokens from shared test data and logs.
 
 When reviewing a change, confirm the affected documents identify the entry point, behaviour, error handling and tests. Check whether any linked architecture decision still describes the implementation. Record unchecked assumptions and any manual media playback that was not performed.
+
+## Agent hooks
+
+Run `npm run setup:hooks` once per clone to enable `.githooks/pre-commit`. It runs lint, strict type checking, and unit tests before each commit. Copilot workspace hooks in `.github/hooks/` block selected destructive shell commands and format supported edited files with Prettier. Review hook changes as executable code and run `npm run harness:score` after changing harness files.
 
 ## Verify a deleted download
 

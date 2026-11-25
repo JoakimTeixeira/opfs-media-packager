@@ -90,6 +90,8 @@ export default [
       "reports/**",
       "test-results/**",
       ".stryker-tmp/**",
+      ".agents/skills/**",
+      ".github/skills/**",
     ],
   },
   {

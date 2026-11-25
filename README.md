@@ -1,6 +1,6 @@
 # OPFS Media Packager
 
-![Harness Score](https://img.shields.io/badge/harness_score-L0-16a877?style=flat-square&labelColor=14232f&logo=lighthouse&logoColor=white) ![Tests](https://img.shields.io/badge/tests-209%20passing-2ea44f?style=flat-square&labelColor=14232f&logo=node.js&logoColor=white) ![Coverage](https://img.shields.io/badge/coverage-100%25-2ea44f?style=flat-square&labelColor=14232f&logo=v8&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square&labelColor=14232f&logo=typescript&logoColor=white) ![Chrome MV3](https://img.shields.io/badge/Chrome-MV3%20120%2B-4285f4?style=flat-square&labelColor=14232f&logo=googlechrome&logoColor=white) ![Code Style: Prettier](https://img.shields.io/badge/code_style-prettier-ff69b4?style=flat-square&labelColor=14232f&logo=prettier&logoColor=white) ![Lint: ESLint](https://img.shields.io/badge/lint-eslint-4b32c3?style=flat-square&labelColor=14232f&logo=eslint&logoColor=white) ![License: MIT](https://img.shields.io/badge/license-MIT-dfb317?style=flat-square&labelColor=14232f&logo=opensourceinitiative&logoColor=white)
+![Harness Score](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FJoakimTeixeira%2Fopfs-media-packager%2Fci-badges%2Fharness.json&style=flat-square&labelColor=14232f&logo=lighthouse&logoColor=white) [![CI/CD](https://img.shields.io/github/actions/workflow/status/JoakimTeixeira/opfs-media-packager/ci.yml?branch=main&style=flat-square&label=CI%2FCD&labelColor=14232f)](https://github.com/JoakimTeixeira/opfs-media-packager/actions/workflows/ci.yml) ![Tests](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FJoakimTeixeira%2Fopfs-media-packager%2Fci-badges%2Ftests.json&style=flat-square&labelColor=14232f&logo=node.js&logoColor=white) ![Line coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FJoakimTeixeira%2Fopfs-media-packager%2Fci-badges%2Fline-coverage.json&style=flat-square&labelColor=14232f&logo=v8&logoColor=white) ![Branch coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FJoakimTeixeira%2Fopfs-media-packager%2Fci-badges%2Fbranch-coverage.json&style=flat-square&labelColor=14232f&logo=v8&logoColor=white) ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square&labelColor=14232f&logo=typescript&logoColor=white) ![Chrome MV3](https://img.shields.io/badge/Chrome-MV3%20120%2B-4285f4?style=flat-square&labelColor=14232f&logo=googlechrome&logoColor=white) ![Code Style: Prettier](https://img.shields.io/badge/code_style-prettier-ff69b4?style=flat-square&labelColor=14232f&logo=prettier&logoColor=white) ![Lint: ESLint](https://img.shields.io/badge/lint-eslint-4b32c3?style=flat-square&labelColor=14232f&logo=eslint&logoColor=white) ![License: MIT](https://img.shields.io/badge/license-MIT-dfb317?style=flat-square&labelColor=14232f&logo=opensourceinitiative&logoColor=white)
 
 OPFS Media Packager (`v2.49`) is a local-first Chrome Manifest V3 extension that packages authorized streaming videos, subtitles, and companion page documents into portable offline files directly in the browser.
 
@@ -8,16 +8,16 @@ It detects HLS video streams (where a `.m3u8` manifest lists sequential video pi
 
 ## Harness score
 
-Baseline scan from [harness-score](https://github.com/paladini/harness-score): **Level 0 (Unharnessed) — 35/105 (33%)**.
+Latest scan from [harness-score](https://github.com/paladini/harness-score) v1.12.0: **Level 4 (Self-correcting) — 105/105 (100%)**. L4 is the highest defined level.
 
-| Dimension          | Baseline     |
+| Dimension          | Current      |
 | ------------------ | ------------ |
-| Context & Guides   | 2/20 (10%)   |
-| Skills & Commands  | 0/17 (0%)    |
-| Hooks & Guardrails | 0/14 (0%)    |
+| Context & Guides   | 20/20 (100%) |
+| Skills & Commands  | 17/17 (100%) |
+| Hooks & Guardrails | 14/14 (100%) |
 | Sensors & Feedback | 20/20 (100%) |
-| CI Feedback        | 0/14 (0%)    |
-| Hygiene & Safety   | 13/20 (65%)  |
+| CI Feedback        | 14/14 (100%) |
+| Hygiene & Safety   | 20/20 (100%) |
 
 ## Scope and limits
 
@@ -28,9 +28,10 @@ The extension uses the page that is already open and signed in. Chrome manages t
 Prerequisites: Node.js 26.13.0 with npm and Google Chrome 120 or newer. Node.js 26.13.0 was available in the development environment for this release. Other Node.js versions have not been verified for this release. Install Node.js from [nodejs.org](https://nodejs.org/en/download), then check `node --version` and `npm --version`.
 
 1. Run `npm ci` to install the locked project dependencies.
-2. Run `npm run build` to create the files in `dist/`.
-3. Open `chrome://extensions`, enable **Developer mode**, select **Load unpacked**, and choose this project folder.
-4. Reload an open video or playlist tab so Chrome attaches the page detector. For unattended saves, turn off Chrome's **Ask where to save each file before downloading** setting in `chrome://settings/downloads`.
+2. Run `npm run setup:hooks` to enable the repository's pre-commit checks.
+3. Run `npm run build` to create the files in `dist/`.
+4. Open `chrome://extensions`, enable **Developer mode**, select **Load unpacked**, and choose this project folder.
+5. Reload an open video or playlist tab so Chrome attaches the page detector. For unattended saves, turn off Chrome's **Ask where to save each file before downloading** setting in `chrome://settings/downloads`.
 
 ## Use
 

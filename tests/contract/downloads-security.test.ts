@@ -1,6 +1,6 @@
 import { test, assert } from "vitest";
 import { readdir, readFile } from "node:fs/promises";
-import { extname, join } from "node:path";
+import { extname, join, relative as relativePath } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = new URL("../..", import.meta.url);
@@ -14,8 +14,10 @@ async function listTextFiles(
   const results: string[] = [];
 
   for (const entry of entries) {
-    if (skipDirs.has(entry.name)) continue;
     const full = join(directory, entry.name);
+    const relativeFilePath = relativePath(rootPath, full);
+
+    if (skipDirs.has(entry.name) || skipDirs.has(relativeFilePath)) continue;
 
     if (entry.isDirectory()) {
       results.push(...(await listTextFiles(full, skipDirs)));
@@ -237,6 +239,8 @@ test("should use only anonymized example domains and documented public integrati
       ".stryker-tmp",
       "coverage",
       "reports",
+      join(".agents", "skills"),
+      join(".github", "skills"),
     ]),
   );
 
@@ -304,7 +308,15 @@ test("should prevent else-branch and nested-ternary cognitive complexity regress
 test("should keep documentation files within line-length budgets", async () => {
   const files = await listTextFiles(
     rootPath,
-    new Set(["node_modules", "vendor", "dist", "test-results", ".stryker-tmp"]),
+    new Set([
+      "node_modules",
+      "vendor",
+      "dist",
+      "test-results",
+      ".stryker-tmp",
+      join(".agents", "skills"),
+      join(".github", "skills"),
+    ]),
   );
 
   const markdownFiles = files.filter((file) => extname(file) === ".md");

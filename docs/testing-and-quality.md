@@ -10,7 +10,7 @@ New or changed test names should start with `should` and describe one observable
 | ----------- | -------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | Unit        | `npm run test:unit`        | Checks individual `lib/` and `src/` behaviours. Some tests supply mock browser objects or request functions. |
 | Integration | `npm run test:integration` | Several modules work together with a local server and mocked Chrome APIs.                                    |
-| Contract    | `npm run test:contract`    | Built files, manifest entries, HTML pages, documentation limits, and security expectations remain valid.     |
+| Contract    | `npm run test:contract`    | Built files, manifest entries, HTML pages, documentation limits, security expectations, and Copilot hook behavior remain valid. |
 | Browser     | `npm run test:e2e`         | A real Chromium extension flow works with Playwright.                                                        |
 | Mutation    | `npm run test:mutation`    | Tests detect intentional small code changes, such as a reversed condition.                                   |
 

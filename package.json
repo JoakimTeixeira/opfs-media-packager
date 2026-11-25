@@ -11,6 +11,7 @@
     "check:architecture": "vitest run tests/architecture",
     "test:e2e": "playwright test --config=playwright.config.mjs",
     "setup:e2e": "playwright install chromium",
+    "setup:hooks": "git config core.hooksPath .githooks",
     "test:contract": "vitest run tests/contract",
     "coverage": "vitest run --coverage",
     "coverage:check": "vitest run --coverage",
@@ -27,7 +28,6 @@
     "check:dead-code": "knip",
     "check:quality": "npm run check:duplication && npm run check:dead-code",
     "harness:score": "harness-score",
-    "harness:badge": "harness-score --badge docs/harness-badge.svg",
     "verify": "npm run build && npm run format:check && npm run lint && npm run check:quality && npm run typecheck && npm test && npm run coverage:check && npm run test:e2e",
     "test:watch": "vitest"
   },

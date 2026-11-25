@@ -11,7 +11,7 @@ OPFS Media Packager is a local-first Chrome Manifest V3 extension for saving aut
 - Run focused unit tests with `npm run test:unit` and integration tests with `npm run test:integration`.
 - Run all Vitest tests with `npm test`; run browser flows with `npm run test:e2e` after `npm run setup:e2e` if Chromium is missing.
 - Run `npm run verify` for build, formatting, lint, quality, type checks, tests, coverage, and browser checks. Run mutation tests separately with `npm run test:mutation`.
-- Measure agent-harness maturity with `npm run harness:score`; generate its badge with `npm run harness:badge`.
+- Measure agent-harness maturity with `npm run harness:score`.
 
 ## Architecture
 

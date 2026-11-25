@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": "node scripts/copilot-hooks.mjs",
+        "powershell": "node scripts/copilot-hooks.mjs",
+        "timeoutSec": 5
+      }
+    ],
+    "postToolUse": [
+      {
+        "type": "command",
+        "bash": "node scripts/copilot-hooks.mjs",
+        "powershell": "node scripts/copilot-hooks.mjs",
+        "timeoutSec": 30
+      }
+    ]
+  }
+}
