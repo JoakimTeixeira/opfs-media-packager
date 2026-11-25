@@ -1,4 +1,5 @@
 {
+  "$schema": "https://json.schemastore.org/htmlhint",
   "tagname-lowercase": true,
   "attr-lowercase": true,
   "attr-value-double-quotes": true,
