@@ -1,10 +1,21 @@
+import {
+  playlistKind,
+  subtitleKind,
+  languageLabel,
+  languageInUrl,
+  languageInName,
+  bytesFromBase64,
+  base64FromBytes,
+  transcriptMetadataFields,
+  directQualityOption,
+  playlistMetadata,
+} from "./background-media.ts";
 import { knownSubtitleTracksFromPage } from "../lib/security/page-subtitles.ts";
 import { languageInText } from "../lib/subtitles/subtitle-language.ts";
 import { decodeSubtitleBytes } from "../lib/subtitles/subtitle-encoding.ts";
 import {
   hasSpokenSubtitleCues,
   isStoryboardSubtitleUrl,
-  isSubtitleResourceUrl,
   isTranscriptMetadataUrl,
 } from "../lib/subtitles/subtitle-tracks.ts";
 import {
@@ -23,7 +34,6 @@ import {
   type PdfJpegPage,
 } from "../lib/materials/pdf-builder.ts";
 import {
-  parseHlsMaster,
   qualityOptionKey,
   type HlsMasterMetadata,
   type VideoQualityOption,
@@ -500,94 +510,6 @@ async function fetchFromPlaylistPage(
   });
 }
 
-function playlistKind(url: string): boolean {
-  try {
-    return (
-      Boolean(safeMediaUrl(url)) && /\.m3u8?$/i.test(new URL(url).pathname)
-    );
-  } catch {
-    return false;
-  }
-}
-
-function subtitleKind(url: string): boolean {
-  return Boolean(safeMediaUrl(url)) && isSubtitleResourceUrl(url);
-}
-
-function isGenericSubtitleLabel(value: string): boolean {
-  return (
-    !value ||
-    /^(?:subtitle|subtitles|caption|captions|legenda|legendas|cc|track|default|unknown|und)$/i.test(
-      String(value).trim(),
-    )
-  );
-}
-
-function languageLabel(code: string): string {
-  if (!code || isGenericSubtitleLabel(code)) return "";
-  const languageTag = code.toLowerCase().replace("_", "-").trim();
-
-  const names: Readonly<Record<string, string>> = {
-    pt: "Portuguese",
-    "pt-br": "Portuguese (Brazil)",
-    "pt-pt": "Portuguese (Portugal)",
-    en: "English",
-    "en-us": "English (US)",
-    "en-gb": "English (UK)",
-    es: "Spanish",
-    fr: "French",
-    de: "German",
-    it: "Italian",
-    ja: "Japanese",
-    ko: "Korean",
-    zh: "Chinese",
-    "zh-cn": "Chinese (Simplified)",
-    "zh-tw": "Chinese (Traditional)",
-  };
-
-  return names[languageTag] || languageInName(code) || code;
-}
-
-function languageInUrl(url: string): string {
-  const text = decodeURIComponent(new URL(url).pathname).toLowerCase();
-
-  const match = text.match(
-    /(?:^|[._/-])(pt-br|pt-pt|en-us|en-gb|zh-cn|zh-tw|pt|en|es|fr|de|it|ja|ko|zh)(?:[._/-]|$)/,
-  );
-
-  return match ? languageLabel(match[1]) : "";
-}
-
-function languageInName(name: string): string {
-  const value = String(name || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase();
-
-  const names: readonly (readonly [string, string])[] = [
-    ["portuguese", "Portuguese"],
-    ["portugues", "Portuguese"],
-    ["english", "English"],
-    ["ingles", "English"],
-    ["spanish", "Spanish"],
-    ["espanol", "Spanish"],
-    ["espanhol", "Spanish"],
-    ["french", "French"],
-    ["francais", "French"],
-    ["frances", "French"],
-    ["german", "German"],
-    ["deutsch", "German"],
-    ["alemao", "German"],
-    ["italian", "Italian"],
-    ["italiano", "Italian"],
-    ["japanese", "Japanese"],
-    ["korean", "Korean"],
-    ["chinese", "Chinese"],
-  ];
-
-  return names.find(([needle]) => value.includes(needle))?.[1] || "";
-}
-
 function hasSubtitleCues(text: string): boolean {
   return hasSpokenSubtitleCues(text);
 }
@@ -595,31 +517,6 @@ function hasSubtitleCues(text: string): boolean {
 interface InspectedSubtitle {
   readonly language: string;
   readonly resolvedUrl?: string;
-}
-
-function bytesFromBase64(value: string): Uint8Array {
-  const binary = atob(value);
-
-  return Uint8Array.from(binary, (character) => character.charCodeAt(0));
-}
-
-function base64FromBytes(bytes: Uint8Array): string {
-  const chunkSize = 0x8000;
-  const parts: string[] = [];
-
-  for (
-    const cursor = { offset: 0 };
-    cursor.offset < bytes.length;
-    cursor.offset += chunkSize
-  ) {
-    parts.push(
-      String.fromCharCode(
-        ...bytes.subarray(cursor.offset, cursor.offset + chunkSize),
-      ),
-    );
-  }
-
-  return btoa(parts.join(""));
 }
 
 async function fetchSubtitleText(
@@ -655,40 +552,6 @@ async function fetchSubtitleText(
     return decodeSubtitleBytes(bytesFromBase64(pageResponse.body));
   } catch {
     return "";
-  }
-}
-
-function transcriptMetadataFields(content: string): {
-  readonly resolvedUrl: string | null;
-  readonly language: string;
-} | null {
-  try {
-    const record = externalRecord(JSON.parse(content));
-
-    if (!record) return null;
-
-    const candidateUrl =
-      record.webvtt_file_url ??
-      record.vtt_url ??
-      record.subtitle_url ??
-      record.captions_url ??
-      record.transcript_url ??
-      record.url;
-
-    const resolvedUrl = safeMediaUrl(candidateUrl);
-
-    const rawLang =
-      [record.language, record.locale, record.lang, record.srclang].find(
-        (value): value is string =>
-          typeof value === "string" && Boolean(value.trim()),
-      ) || "";
-
-    return {
-      resolvedUrl,
-      language: languageLabel(rawLang) || languageInName(rawLang),
-    };
-  } catch {
-    return null;
   }
 }
 
@@ -754,33 +617,6 @@ async function inspectSubtitle(
     fromUrl || languageInText(content) || fallbackLanguage || "Subtitle";
 
   return { language };
-}
-
-/** Creates a selectable quality option when a player requested one quality. */
-function directQualityOption(url: string): VideoQualityOption | null {
-  const parsed = new URL(url);
-  const qualityPathSegment = parsed.pathname.split("/").at(-2) || "";
-  const match = qualityPathSegment.match(/^(\d{3,4})p$/i);
-
-  return match ? { url, label: `${match[1]}p` } : null;
-}
-
-/**
- * Players can request /1080p/video.m3u8 even when an adjacent master manifest
- * lists every available video quality.
- */
-function playlistMetadata(text: string, baseUrl: string): HlsMasterMetadata {
-  const master = parseHlsMaster(text, baseUrl);
-
-  return {
-    ...master,
-    subtitles: master.subtitles
-      .map((track) => ({
-        ...track,
-        language: languageLabel(track.language) || languageInName(track.label),
-      }))
-      .filter((track) => track.language),
-  };
 }
 
 function rawStoredStreams(value: ExternalRecord | null): unknown[] {
