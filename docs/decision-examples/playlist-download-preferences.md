@@ -12,7 +12,7 @@ await resumePlaylist({ format: retryFormat });
 Better illustrative example. The saved playlist plan supplies the chosen value and the shared preference rule handles invalid values.
 
 ```ts
-import { outputFormatOrDefault } from "./lib/download-preferences.ts";
+import { outputFormatOrDefault } from "./lib/downloads/download-preferences.ts";
 
 const retryFormat = outputFormatOrDefault(savedPlan.outputFormat);
 await resumePlaylist({ format: retryFormat });

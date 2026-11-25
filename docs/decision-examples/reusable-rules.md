@@ -15,7 +15,7 @@ function readConcurrency() {
 Better illustrative example. The page reads its input and calls the shared rule. The actual rule also handles non-finite values and applies the default.
 
 ```ts
-import { clampConcurrency } from "./lib/segments.ts";
+import { clampConcurrency } from "./lib/downloads/segments.ts";
 
 const requested = Number(parallelField.value);
 const allowed = clampConcurrency(requested);

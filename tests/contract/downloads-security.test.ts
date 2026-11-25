@@ -4,7 +4,7 @@ import { readdir, readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const root = new URL("../../", import.meta.url);
+const root = new URL("../..", import.meta.url);
 const rootPath = fileURLToPath(root);
 
 async function listTextFiles(
@@ -36,20 +36,20 @@ async function listTextFiles(
 }
 
 test("should keep page-originated data behind a validated message and URL boundary", async () => {
-  const background = await readFile(new URL("background.ts", root), "utf8");
+  const background = await readFile(new URL("src/background.ts", root), "utf8");
 
   const mediaRequest = await readFile(
-    new URL("lib/media-request.ts", root),
+    new URL("lib/media/media-request.ts", root),
     "utf8",
   );
 
-  const content = await readFile(new URL("content.ts", root), "utf8");
-  const app = await readFile(new URL("app.ts", root), "utf8");
-  const popup = await readFile(new URL("popup.ts", root), "utf8");
-  const course = await readFile(new URL("playlist.ts", root), "utf8");
+  const content = await readFile(new URL("src/content.ts", root), "utf8");
+  const app = await readFile(new URL("src/app.ts", root), "utf8");
+  const popup = await readFile(new URL("src/popup.ts", root), "utf8");
+  const course = await readFile(new URL("src/playlist.ts", root), "utf8");
 
   const pageCourseProbe = await readFile(
-    new URL("page-playlist-probe.ts", root),
+    new URL("src/page-playlist-probe.ts", root),
     "utf8",
   );
 
@@ -81,11 +81,11 @@ test("should keep page-originated data behind a validated message and URL bounda
 
   assert.match(
     app,
-    /shouldHaltPlaylistQueue[\s\S]*from "\.\/lib\/playlist-queue-policy\.ts"/,
+    /shouldHaltPlaylistQueue[\s\S]*from "\.\.\/lib\/playlist\/playlist-queue-policy\.ts"/,
   );
 
   const queuePolicy = await readFile(
-    new URL("lib/playlist-queue-policy.ts", root),
+    new URL("lib/playlist/playlist-queue-policy.ts", root),
     "utf8",
   );
 
@@ -258,12 +258,12 @@ test("should use only anonymized example domains and documented public integrati
 
 test("should prevent else-branch and nested-ternary cognitive complexity regressions in core scripts", async () => {
   const coreFiles = [
-    "background.ts",
-    "content.ts",
-    "playlist.ts",
-    "page-playlist-probe.ts",
-    "lib/subtitle-language.ts",
-    "lib/extension-messages.ts",
+    "src/background.ts",
+    "src/content.ts",
+    "src/playlist.ts",
+    "src/page-playlist-probe.ts",
+    "lib/subtitles/subtitle-language.ts",
+    "lib/security/extension-messages.ts",
   ];
 
   for (const relative of coreFiles) {

@@ -3,16 +3,16 @@
   "type": "module",
   "scripts": {
     "build": "npm run build:extension && node scripts/check-extension-files.ts",
-    "build:extension": "esbuild app.ts background.ts playlist.ts popup.ts --bundle --format=esm --target=chrome120 --sourcemap --tree-shaking=true --outdir=dist && esbuild content.ts page-playlist-probe.ts --bundle --format=iife --target=chrome120 --sourcemap --tree-shaking=true --outdir=dist",
-    "test": "node --test lib/*.test.ts tests/contract/*.test.ts tests/architecture/*.test.ts tests/integration/*.test.ts",
-    "test:unit": "node --test lib/*.test.ts",
-    "test:integration": "node --test tests/integration/*.test.ts",
+    "build:extension": "esbuild src/app.ts src/background.ts src/playlist.ts src/popup.ts --bundle --format=esm --target=chrome120 --sourcemap --tree-shaking=true --outdir=dist && esbuild src/content.ts src/page-playlist-probe.ts --bundle --format=iife --target=chrome120 --sourcemap --tree-shaking=true --outdir=dist",
+    "test": "npm run test:unit && node --test tests/contract/*.test.ts tests/architecture/*.test.ts tests/integration/**/*.test.ts",
+    "test:unit": "vitest run",
+    "test:integration": "node --test tests/integration/**/*.test.ts",
     "check:architecture": "node --test tests/architecture/*.test.ts",
     "test:e2e": "playwright test --config=playwright.config.mjs",
     "setup:e2e": "playwright install chromium",
     "test:contract": "node --test tests/contract/*.test.ts",
-    "coverage": "node --test --experimental-test-coverage lib/*.test.ts tests/contract/*.test.ts tests/architecture/*.test.ts tests/integration/*.test.ts",
-    "coverage:check": "c8 --all --include=lib/**/*.ts --exclude=tests/** --exclude=lib/**/*.test.ts --check-coverage --lines 100 --branches 96 --functions 97 --reporter=text node --test lib/*.test.ts tests/contract/*.test.ts tests/architecture/*.test.ts tests/integration/*.test.ts",
+    "coverage": "vitest run --coverage",
+    "coverage:check": "vitest run --coverage",
     "test:mutation": "stryker run",
     "test:mutation:dry": "stryker run --dryRunOnly",
     "format": "prettier --write .",
@@ -20,14 +20,15 @@
     "lint:js": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --project tsconfig.json",
-    "lint:html": "htmlhint \"*.html\"",
+    "lint:html": "htmlhint \"src/*.html\"",
     "lint": "npm run lint:js && npm run lint:html",
     "check:duplication": "jscpd .",
     "check:dead-code": "knip",
     "check:quality": "npm run check:duplication && npm run check:dead-code",
     "harness:score": "harness-score",
     "harness:badge": "harness-score --badge docs/harness-badge.svg",
-    "verify": "npm run build && npm run format:check && npm run lint && npm run check:quality && npm run typecheck && npm test && npm run check:architecture && npm run coverage:check && npm run test:e2e"
+    "verify": "npm run build && npm run format:check && npm run lint && npm run check:quality && npm run typecheck && npm test && npm run check:architecture && npm run coverage:check && npm run test:e2e",
+    "test:watch": "vitest"
   },
   "overrides": {
     "minimatch@^10": "11.0.1",
@@ -37,11 +38,11 @@
   "devDependencies": {
     "@playwright/test": "^1.58.2",
     "@stryker-mutator/core": "^10.1.1",
-    "@stryker-mutator/tap-runner": "^10.1.1",
+    "@stryker-mutator/vitest-runner": "^10.1.1",
     "@stylistic/eslint-plugin": "^6.0.1",
     "@types/chrome": "^0.3.7",
     "@types/node": "^25.9.5",
-    "c8": "^12.0.0",
+    "@vitest/coverage-v8": "^5.1.1",
     "esbuild": "^0.28.2",
     "eslint": "^10.15.0",
     "eslint-config-prettier": "^10.1.8",
@@ -53,6 +54,7 @@
     "lucide": "^1.73.0",
     "prettier": "^3.10.1",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.57.1"
+    "typescript-eslint": "^8.57.1",
+    "vitest": "^5.1.1"
   }
 }

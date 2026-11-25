@@ -11,16 +11,17 @@ interface ManifestContentScript {
 
 interface ExtensionManifest {
   readonly permissions: readonly string[];
+  readonly action: { readonly default_popup: string };
   readonly background: { readonly service_worker: string };
   readonly content_scripts: readonly ManifestContentScript[];
   readonly web_accessible_resources?: readonly unknown[];
 }
 
-const root = new URL("../../", import.meta.url);
+const root = new URL("../..", import.meta.url);
 
 test("should schedule downloads without a per-download picker", async () => {
-  const source = await readFile(new URL("app.ts", root), "utf8");
-  const background = await readFile(new URL("background.ts", root), "utf8");
+  const source = await readFile(new URL("src/app.ts", root), "utf8");
+  const background = await readFile(new URL("src/background.ts", root), "utf8");
 
   assert.match(source, /chrome\.downloads\.download/);
   assert.match(source, /saveAs: false/);
@@ -35,7 +36,7 @@ test("should schedule downloads without a per-download picker", async () => {
 
   assert.doesNotMatch(source, /showDirectoryPicker/);
   assert.doesNotMatch(source, /showSaveFilePicker/);
-  const popup = await readFile(new URL("popup.ts", root), "utf8");
+  const popup = await readFile(new URL("src/popup.ts", root), "utf8");
 
   assert.doesNotMatch(popup, /chrome:\/\/settings\/downloads/);
 });
@@ -45,8 +46,8 @@ test("should schedule a matching MP4 subtitle without a second picker", async ()
     await readFile(new URL("manifest.json", root), "utf8"),
   ) as ExtensionManifest;
 
-  const source = await readFile(new URL("app.ts", root), "utf8");
-  const background = await readFile(new URL("background.ts", root), "utf8");
+  const source = await readFile(new URL("src/app.ts", root), "utf8");
+  const background = await readFile(new URL("src/background.ts", root), "utf8");
 
   assert.ok(manifest.permissions.includes("downloads"));
   assert.ok(!manifest.permissions.includes("contentSettings"));
@@ -66,7 +67,7 @@ test("should schedule a matching MP4 subtitle without a second picker", async ()
 });
 
 test("should use a conventional FFmpeg MP4 remux instead of Media Source fragments", async () => {
-  const source = await readFile(new URL("app.ts", root), "utf8");
+  const source = await readFile(new URL("src/app.ts", root), "utf8");
 
   assert.match(source, /new FFmpeg\(\)/);
 
@@ -85,7 +86,7 @@ test("should use a conventional FFmpeg MP4 remux instead of Media Source fragmen
   assert.match(source, /type: "set-download-tab-keepalive"/);
   assert.doesNotMatch(source, /createMp4Remuxer/);
 
-  const background = await readFile(new URL("background.ts", root), "utf8");
+  const background = await readFile(new URL("src/background.ts", root), "utf8");
 
   const ffmpegClasses = await readFile(
     new URL("vendor/ffmpeg/classes.js", root),
@@ -103,8 +104,8 @@ test("should use a conventional FFmpeg MP4 remux instead of Media Source fragmen
 });
 
 test("should offer MP4 sidecar and MKV embedded subtitle output", async () => {
-  const page = await readFile(new URL("index.html", root), "utf8");
-  const source = await readFile(new URL("app.ts", root), "utf8");
+  const page = await readFile(new URL("src/index.html", root), "utf8");
+  const source = await readFile(new URL("src/app.ts", root), "utf8");
 
   assert.match(source, /OUTPUT_FORMAT_OPTIONS/);
   assert.match(page, /download-subfolder-status/);
@@ -118,10 +119,11 @@ test("should ship bundled popup, downloader, and course scripts with no bare mod
     await readFile(new URL("manifest.json", root), "utf8"),
   ) as ExtensionManifest;
 
-  const popupHtml = await readFile(new URL("popup.html", root), "utf8");
-  const indexHtml = await readFile(new URL("index.html", root), "utf8");
-  const courseHtml = await readFile(new URL("playlist.html", root), "utf8");
+  const popupHtml = await readFile(new URL("src/popup.html", root), "utf8");
+  const indexHtml = await readFile(new URL("src/index.html", root), "utf8");
+  const courseHtml = await readFile(new URL("src/playlist.html", root), "utf8");
 
+  assert.equal(manifest.action.default_popup, "src/popup.html");
   assert.equal(manifest.background.service_worker, "dist/background.js");
   assert.deepEqual(manifest.content_scripts[0]?.js, ["dist/content.js"]);
 
@@ -129,9 +131,9 @@ test("should ship bundled popup, downloader, and course scripts with no bare mod
     "dist/page-playlist-probe.js",
   ]);
 
-  assert.match(popupHtml, /src="dist\/popup\.js"/);
-  assert.match(indexHtml, /src="dist\/app\.js"/);
-  assert.match(courseHtml, /src="dist\/playlist\.js"/);
+  assert.match(popupHtml, /src="\.\.\/dist\/popup\.js"/);
+  assert.match(indexHtml, /src="\.\.\/dist\/app\.js"/);
+  assert.match(courseHtml, /src="\.\.\/dist\/playlist\.js"/);
 
   const popupBundle = await readFile(new URL("dist/popup.js", root), "utf8");
   const appBundle = await readFile(new URL("dist/app.js", root), "utf8");
@@ -143,9 +145,9 @@ test("should ship bundled popup, downloader, and course scripts with no bare mod
 });
 
 test("should hand off the preferred format and start the download immediately", async () => {
-  const popup = await readFile(new URL("popup.ts", root), "utf8");
-  const app = await readFile(new URL("app.ts", root), "utf8");
-  const background = await readFile(new URL("background.ts", root), "utf8");
+  const popup = await readFile(new URL("src/popup.ts", root), "utf8");
+  const app = await readFile(new URL("src/app.ts", root), "utf8");
+  const background = await readFile(new URL("src/background.ts", root), "utf8");
 
   assert.match(popup, /outputFormat: output\.value,\s*autoStart: true/);
   assert.match(app, /if \(autoStart\) await startDownload\(\)/);
@@ -169,12 +171,12 @@ test("should hand off the preferred format and start the download immediately", 
 });
 
 test("should keep course scanning headless without main-window tab fallbacks or invalid minimized options", async () => {
-  const background = await readFile(new URL("background.ts", root), "utf8");
+  const background = await readFile(new URL("src/background.ts", root), "utf8");
   const backgroundCode = background.replace(/\/\/[^\n]*/g, "");
-  const content = await readFile(new URL("content.ts", root), "utf8");
+  const content = await readFile(new URL("src/content.ts", root), "utf8");
 
   const courseProbe = await readFile(
-    new URL("page-playlist-probe.ts", root),
+    new URL("src/page-playlist-probe.ts", root),
     "utf8",
   );
 

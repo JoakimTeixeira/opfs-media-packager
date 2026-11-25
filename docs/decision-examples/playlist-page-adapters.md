@@ -11,7 +11,7 @@ const supported = new URL(pageUrl).hostname === "media.example";
 Better example. Run the following TypeScript from the project root with the documented Node.js version. Both fictional URLs select the same playlist reader.
 
 ```ts
-import { playlistAdapterId } from "./lib/playlist-adapters.ts";
+import { playlistAdapterId } from "./lib/playlist/playlist-adapters.ts";
 
 playlistAdapterId("https://media.example/c/topic/sections/1/lessons/2");
 // "sidebar-playlist"

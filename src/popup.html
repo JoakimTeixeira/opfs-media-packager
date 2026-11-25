@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OPFS Media Packager</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <div>
+        <strong>OPFS Media Packager</strong
+        ><span id="site">Checking this tab…</span>
+      </div>
+      <button
+        id="clear"
+        title="Clear detected items"
+        aria-label="Clear detected items"
+      >
+        Clear
+      </button>
+    </header>
+    <p class="notice">
+      Play the video first. Detected HLS manifests appear here.
+    </p>
+    <main id="list">
+      <p class="empty">No HLS manifest detected in this tab yet.</p>
+    </main>
+    <p id="popup-status" class="visually-hidden" aria-live="polite"></p>
+    <script type="module" src="../dist/popup.js"></script>
+  </body>
+</html>

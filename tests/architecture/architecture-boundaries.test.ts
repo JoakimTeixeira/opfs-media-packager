@@ -4,13 +4,13 @@ import { readFile } from "node:fs/promises";
 import ts from "typescript";
 
 const pureRuleFiles = [
-  "lib/playlist-queue-policy.ts",
-  "lib/filename.ts",
-  "lib/hls-master.ts",
-  "lib/large-file-remux.ts",
-  "lib/security.ts",
-  "lib/segments.ts",
-  "lib/stream-identity.ts",
+  "lib/playlist/playlist-queue-policy.ts",
+  "lib/shared/filename.ts",
+  "lib/media/hls-master.ts",
+  "lib/downloads/large-file-remux.ts",
+  "lib/security/security.ts",
+  "lib/downloads/segments.ts",
+  "lib/media/stream-identity.ts",
 ];
 
 /** Returns the literal name used to access a global property. */
@@ -110,9 +110,17 @@ test("should keep reusable modules independent of extension entry points", async
     "page-playlist-probe",
   ]);
 
-  for (const name of await readdir(root)) {
-    if (!name.endsWith(".ts") || name.endsWith(".test.ts")) continue;
-    const source = await readFile(new URL(name, root), "utf8");
+  const productionFiles = (await readdir(root, { recursive: true })).filter(
+    (name) => name.endsWith(".ts") && !name.endsWith(".test.ts"),
+  );
+
+  assert.ok(productionFiles.length > 0, "No reusable modules found");
+
+  for (const name of productionFiles) {
+    const source = await readFile(
+      new URL(name.replaceAll("\\", "/"), root),
+      "utf8",
+    );
 
     const file = ts.createSourceFile(
       name,

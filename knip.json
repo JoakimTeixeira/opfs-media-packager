@@ -1,14 +1,20 @@
 {
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": [
-    "background.ts",
-    "playlist.ts",
-    "page-playlist-probe.ts",
-    "popup.ts",
+    "src/background.ts",
+    "src/playlist.ts",
+    "src/page-playlist-probe.ts",
+    "src/popup.ts",
     "scripts/*.ts",
     "tests/**/*.ts",
     "lib/**/*.test.ts"
   ],
-  "project": ["*.ts", "lib/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"],
+  "project": [
+    "*.ts",
+    "lib/**/*.ts",
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    "src/**/*.ts"
+  ],
   "ignoreDependencies": ["@stryker-mutator/api"]
 }

@@ -4,16 +4,16 @@ This guide helps a contributor locate the code and verify changes to OPFS Media 
 
 ## Find the owning code
 
-The project root contains the browser entry points. The [architecture map](project-map.md) identifies each entry point and its responsibility. Reusable rules and their unit tests are in [`lib/`](../lib/). Cross-module checks are in [`tests/`](../tests/), grouped into integration tests, browser flows, contracts, and architecture checks.
+The browser entry points are in [`src/`](../src/). The [architecture map](project-map.md) identifies each entry point and its responsibility. Reusable rules and their unit tests are grouped by feature in [`lib/`](../lib/). Cross-module checks are in [`tests/`](../tests/), grouped into integration tests, browser flows, contracts, and architecture checks.
 
-| Change                          | Where to start                                                                     | Evidence to find or add                                             |
-| ------------------------------- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
-| Playlist page detection         | Page adapters in `lib/` and the page-observation entry points in the project root. | Adapter rules and playlist-scan integration tests.                  |
-| Item request pacing             | Playlist scanning entry points in the project root.                                | Integration tests for request spacing, retries, and host limits.    |
-| Download queue and cancellation | Downloader entry point in the project root and queue rules in `lib/`.              | Browser tests for cancellation, resume, and access failures.        |
-| File names and destination      | Filename and download-folder rules in `lib/`.                                      | Tests for valid names, matching subtitles, and destination folders. |
-| Stored video parts and resume   | Download coordination in the project root and checkpoint rules in `lib/`.          | Checkpoint validation and browser download recovery tests.          |
-| Subtitle language and filtering | Subtitle rules in `lib/`.                                                          | Tests for language recognition and usable subtitle tracks.          |
+| Change                          | Where to start                                                           | Evidence to find or add                                             |
+| ------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| Playlist page detection         | Page adapters in `lib/` and the page-observation entry points in `src/`. | Adapter rules and playlist-scan integration tests.                  |
+| Item request pacing             | Playlist scanning entry points in `src/`.                                | Integration tests for request spacing, retries, and host limits.    |
+| Download queue and cancellation | Downloader entry point in `src/` and queue rules in `lib/`.              | Browser tests for cancellation, resume, and access failures.        |
+| File names and destination      | Filename and download-folder rules in `lib/`.                            | Tests for valid names, matching subtitles, and destination folders. |
+| Stored video parts and resume   | Download coordination in `src/` and checkpoint rules in `lib/`.          | Checkpoint validation and browser download recovery tests.          |
+| Subtitle language and filtering | Subtitle rules in `lib/`.                                                | Tests for language recognition and usable subtitle tracks.          |
 
 Search for the named responsibility or behaviour within these folders. Run the relevant tests before and after changing it, then run the release checks below.
 

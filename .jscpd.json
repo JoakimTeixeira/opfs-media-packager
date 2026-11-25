@@ -14,7 +14,8 @@
     "**/.stryker-tmp/**",
     "**/*.test.ts",
     "**/*.spec.ts",
-    "**/__mocks__/**"
+    "**/__mocks__/**",
+    "**/__fixtures__/**"
   ],
   "format": ["typescript", "javascript"]
 }

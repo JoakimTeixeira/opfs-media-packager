@@ -28,7 +28,7 @@ Each entry states the problem, the chosen approach, and the observable result. T
 
 **Alternatives and trade-off:** Visible tabs provide a full page environment but can interrupt the user. Page requests are quieter but may miss content created only after rendering. Hidden frames and a minimized window provide fallback paths and add coordination complexity.
 
-**Evidence and review trigger:** The playlist scanner in the project root and the scan tests in [`tests/integration/`](../tests/integration/) cover pacing and repeated responses. Revisit the approach when a supported page requires a different execution environment or the host changes its request policy.
+**Evidence and review trigger:** The playlist scanner in `src/` and the scan tests in [`tests/integration/`](../tests/integration/) cover pacing and repeated responses. Revisit the approach when a supported page requires a different execution environment or the host changes its request policy.
 
 **Concrete example:** Two consecutive HTTP 429 responses stop the current scan. The [playlist scan sequence](decision-examples/playlist-scan-pacing.md) shows both requests and responses.
 
@@ -89,7 +89,7 @@ The second example is illustrative and omits failure classification. See the [qu
 
 **Alternatives and limits:** Keeping the full video in memory increases memory pressure. A native helper requires installation outside Chrome. The chosen browser storage still depends on available disk space and browser storage rules. When that storage is unavailable, the code has a memory-backed fallback that may be unsuitable for large videos. Review the decision if browser storage or supported file sizes change.
 
-**Evidence:** The download coordinator in the project root, checkpoint rules in [`lib/`](../lib/), and checkpoint and resume tests in [`tests/`](../tests/).
+**Evidence:** The download coordinator in `src/`, checkpoint rules in [`lib/`](../lib/), and checkpoint and resume tests in [`tests/`](../tests/).
 
 **Concrete example:** A resumed download validates saved parts before deciding what to fetch. See the [checkpoint flow](decision-examples/large-downloads-and-checkpoints.md).
 
@@ -124,7 +124,7 @@ The second example is illustrative and omits failure classification. See the [qu
 **Example: select a reader from the page route.** This example runs from the project root with Node.js and uses fictional URLs. A supported route selects the same reader on different hosts. An unrelated route returns `null`.
 
 ```ts
-import { playlistAdapterId } from "./lib/playlist-adapters.ts";
+import { playlistAdapterId } from "./lib/playlist/playlist-adapters.ts";
 
 playlistAdapterId("https://media.example/c/topic/sections/1/lessons/2");
 // "sidebar-playlist"

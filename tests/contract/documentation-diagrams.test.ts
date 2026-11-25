@@ -66,7 +66,7 @@ test("should detect unclosed fences and diagram statements outside Markdown fenc
 });
 
 test("should keep Markdown fences closed and diagram statements inside code fences", async () => {
-  const root = fileURLToPath(new URL("../../", import.meta.url));
+  const root = fileURLToPath(new URL("../..", import.meta.url));
 
   const entries = await readdir(join(root, "docs"), {
     recursive: true,

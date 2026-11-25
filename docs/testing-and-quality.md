@@ -16,7 +16,11 @@ New or changed test names should start with `should` and describe one observable
 
 The test pyramid keeps most tests fast at the unit layer. Integration and browser tests cover the connections that unit tests cannot observe. Mutation testing checks whether the tests would catch common implementation mistakes.
 
-Unit tests sit beside their modules in `lib/`. Cross-module tests live in `tests/integration/`, and browser flows live in `tests/e2e/`. `tests/contract/` checks packaging, security, and documentation agreements, while `tests/architecture/` checks dependency boundaries. Integration mocks live in `tests/integration/mocks/`, and browser fixtures live in `tests/e2e/fixtures/`. Coverage and mutation runs use these existing tests rather than a separate test layer.
+Unit tests sit beside their modules in feature folders under `lib/` and run with Vitest. Cross-module tests live in feature folders under `tests/integration/` and run with Node.js. Browser flows live in feature folders under `tests/e2e/` and run with Playwright. `tests/contract/` checks packaging, security, and documentation agreements, while `tests/architecture/` checks dependency boundaries. Coverage and mutation runs use the Vitest unit tests.
+
+Feature-specific `__fixtures__/` folders hold prepared test inputs. Feature-specific `__mocks__/` folders hold simulated dependencies, such as the playlist scan's mocked Chrome APIs. Shared browser lifecycle helpers live in `tests/e2e/support/`. These helpers use explicit imports; folder names do not enable automatic mocking in this project.
+
+Each reusable module owns its colocated unit tests. When a module has several test files, the files share the module's name and identify the behaviour they cover. The extension entry points in `src/` are covered by integration, contract, and browser tests: playlist scans exercise `background.ts`, `content.ts`, and `page-playlist-probe.ts`, while browser download and playlist flows exercise `app.ts`, `popup.ts`, and `playlist.ts`.
 
 ## Test techniques and intent
 
@@ -40,7 +44,7 @@ Unit tests sit beside their modules in `lib/`. Cross-module tests live in `tests
 | `npm run format:check`       | Verify consistent formatting with Prettier.                                                                               |
 | `npm run lint`               | Run ESLint and HTMLHint. Any warning fails the command.                                                                   |
 | `npm run typecheck`          | Run strict TypeScript checks.                                                                                             |
-| `npm test`                   | Run Node.js unit, integration, contract, and architecture tests.                                                          |
+| `npm test`                   | Run Vitest unit tests and Node.js integration, contract, and architecture tests.                                          |
 | `npm run coverage:check`     | Require 100% line coverage, at least 96% branch coverage, and at least 97% function coverage for `lib/`.                  |
 | `npm run test:e2e`           | Run the real Chromium extension workflow. Run `npm run setup:e2e` once when Playwright's browser is missing.              |
 | `npm run test:mutation`      | Run Stryker against the modules listed in `stryker.config.mjs`. The configured score threshold is 100%.                   |
@@ -52,7 +56,7 @@ Unit tests sit beside their modules in `lib/`. Cross-module tests live in `tests
 
 - Keep test files at or below 400 physical lines, including blank lines and comments. ESLint enforces the limit for test and spec files.
 - Group unit tests by the module they exercise and name scenario files after the behaviour they cover.
-- Extract shared mocks and large fixtures into clearly named helpers near their tests. Keep test cases independent so the runner can execute test files in parallel.
+- Keep prepared inputs in a feature's `__fixtures__/` directory and simulated dependencies in its `__mocks__/` directory. Keep test cases independent so the runner can execute test files in parallel.
 - Start with a focused test around the rule that needs to change. This creates a safe seam in existing code before refactoring.
 - Assert visible behaviour and meaningful state. Avoid asserting private implementation details unless they enforce a security or browser contract.
 - Use local fake servers for network cases. They make authorization, rate-limit, retry, and timeout behaviour repeatable.
@@ -82,7 +86,7 @@ The lint configuration also enforces the Object Calisthenics profile used by thi
 
 For a review, start with `npm run verify`. Run `npm run test:mutation` when core rules, security boundaries, queue transitions, or retry behaviour change. Keep the command output or continuous-integration record with the release evidence.
 
-Coverage thresholds apply to production modules in `lib/`, excluding colocated test files. They do not measure `app.ts`, `background.ts`, or `page-playlist-probe.ts`. Mutation testing covers the modules explicitly listed in [stryker.config.mjs](../stryker.config.mjs). Passing a coverage threshold or a mutation run does not prove that every behaviour is correct.
+Coverage thresholds apply to production modules in `lib/`, excluding colocated test files. They do not measure `src/app.ts`, `src/background.ts`, or `src/page-playlist-probe.ts`. Mutation testing covers the modules explicitly listed in [stryker.config.mjs](../stryker.config.mjs). Passing a coverage threshold or a mutation run does not prove that every behaviour is correct.
 
 The current browser suite uses local test media and simulated sites. It does not establish compatibility with every real site or prove audio and video synchronization across every player. When modifying packaging, inspect a representative output file and record the media format, duration and subtitle behaviour.
 
