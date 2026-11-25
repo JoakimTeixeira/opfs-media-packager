@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import {
   COURSE_ORIGIN,
   stringField,
@@ -132,10 +131,10 @@ test("list-detections recovers empty quality options via course page fallback an
     readonly playlistOutline?: { readonly items: readonly unknown[] };
   };
 
-  assert.equal(listed?.playlistOutline?.items?.length, 21);
-  assert.equal(listed?.streams?.[0]?.kind, "master");
+  assert.strictEqual(listed?.playlistOutline?.items?.length, 21);
+  assert.strictEqual(listed?.streams?.[0]?.kind, "master");
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     listed?.streams?.[0]?.qualityOptions.map((option) => option.label),
     ["1080p (1920×1080)", "720p (1280×720)", "480p (854×480)"],
   );

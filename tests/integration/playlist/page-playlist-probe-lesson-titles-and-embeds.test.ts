@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import { fromVmRealm } from "./__mocks__/page-playlist-probe-environment.ts";
 import { createProbeSandbox } from "./__mocks__/page-playlist-probe-sandbox.ts";
 
@@ -341,25 +340,25 @@ test("resolves punctuation-sanitized titles, section-scoped duplicate titles, em
   ]);
 
   // Duplicate "Introdução" resolves explicitly to section 102 (1002), NOT 1001.
-  assert.equal(
+  assert.strictEqual(
     result.discovered.get(1)?.mediaUrl,
     "https://media.example.net/intro-1002/playlist.m3u8",
   );
 
   // Sanitized titles resolved their real lesson JSON in Tier 1 without falling into sidebar Tier 1.5!
-  assert.equal(
+  assert.strictEqual(
     result.partialLessons.get(0)?.mediaUrl,
     "https://media.example.net/1004/playlist.m3u8",
   );
 
-  assert.equal(
+  assert.strictEqual(
     result.partialLessons.get(2)?.mediaUrl,
     "https://media.example.net/1005/playlist.m3u8",
   );
 
   // Lesson 1006 resolved embed SGID into Markdown + Tier 1.5 linkedUrl.
-  assert.deepEqual(fromVmRealm(result.unresolvedIndices), [0, 2, 3, 4]);
-  assert.equal(result.unresolvedLinks["3"], linkedPreviewLiveUrl);
+  assert.deepStrictEqual(fromVmRealm(result.unresolvedIndices), [0, 2, 3, 4]);
+  assert.strictEqual(result.unresolvedLinks["3"], linkedPreviewLiveUrl);
 
   assert.ok(
     result.partialLessons
@@ -368,6 +367,6 @@ test("resolves punctuation-sanitized titles, section-scoped duplicate titles, em
   );
 
   // SSR HTML with data-component="VideoPlayer" does NOT short-circuit to checked: true.
-  assert.equal(result.discovered.has(4), false);
-  assert.equal(result.unresolvedLinks["4"], linkedSsrPlayerPostUrl);
+  assert.strictEqual(result.discovered.has(4), false);
+  assert.strictEqual(result.unresolvedLinks["4"], linkedSsrPlayerPostUrl);
 });

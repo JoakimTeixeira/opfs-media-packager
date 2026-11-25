@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import {
   COURSE_ORIGIN,
   type ApiLesson,
@@ -171,19 +170,19 @@ test("Tier 1.5 preserves all 3 quality options across wildcard-CORS credentials:
   const scan = await waitForScanReady(started.scanId, 5000);
 
   assert.ok(scan);
-  assert.equal(scan.status, "ready");
-  assert.equal(scan.discovered.length, 1);
-  assert.deepEqual(fetchOrder, ["master", "rendition"]);
+  assert.strictEqual(scan.status, "ready");
+  assert.strictEqual(scan.discovered.length, 1);
+  assert.deepStrictEqual(fetchOrder, ["master", "rendition"]);
 
   const discovered = scan.discovered[0];
 
-  assert.equal(discovered.url, masterUrl);
-  assert.equal(discovered.kind, "master");
+  assert.strictEqual(discovered.url, masterUrl);
+  assert.strictEqual(discovered.kind, "master");
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     discovered.qualityOptions?.map((option) => option.label),
     ["1080p (1920×1080)", "720p (1280×720)", "480p (854×480)"],
   );
 
-  assert.equal(discovered.subtitles[0]?.language, "Portuguese");
+  assert.strictEqual(discovered.subtitles[0]?.language, "Portuguese");
 });

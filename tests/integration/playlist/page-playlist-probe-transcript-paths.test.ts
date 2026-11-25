@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { expect, test } from "vitest";
 import { fromVmRealm } from "./__mocks__/page-playlist-probe-environment.ts";
 import { createProbeSandbox } from "./__mocks__/page-playlist-probe-sandbox.ts";
 
@@ -125,9 +124,9 @@ test("emits /media_transcripts/<id>.vtt from media_transcript_id with or without
     },
   ]);
 
-  assert.equal(result.unresolvedIndices.length, 0);
+  expect(result.unresolvedIndices.length).toBe(0);
 
-  assert.deepEqual(fromVmRealm(result.discovered.get(0)?.subtitles), [
+  expect(fromVmRealm(result.discovered.get(0)?.subtitles)).toEqual([
     {
       url: "https://training.example/media_transcripts/4242395.vtt",
       language: "pt-BR",
@@ -135,21 +134,18 @@ test("emits /media_transcripts/<id>.vtt from media_transcript_id with or without
     },
   ]);
 
-  assert.deepEqual(
+  expect(
     [...(result.discovered.get(1)?.subtitles || [])].map((track) => track.url),
-    ["https://training.example/media_transcripts/4242396.vtt"],
-  );
+  ).toEqual(["https://training.example/media_transcripts/4242396.vtt"]);
 
-  assert.deepEqual(
+  expect(
     [...(result.discovered.get(2)?.subtitles || [])].map((track) => track.url),
-    [
+  ).toEqual([
       "https://assets.example.net/transcript-4242397",
       "https://training.example/media_transcripts/4242397.vtt",
-    ],
-  );
+  ]);
 
-  assert.deepEqual(
+  expect(
     fromVmRealm([...(result.discovered.get(3)?.subtitles || [])]),
-    [],
-  );
+  ).toEqual([]);
 });

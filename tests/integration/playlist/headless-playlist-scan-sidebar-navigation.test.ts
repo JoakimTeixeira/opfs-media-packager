@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import {
   COURSE_ORIGIN,
   type ApiLesson,
@@ -215,28 +214,28 @@ test("Tier 1.5 steps invisibly through sidebar lessons, skips seeded stream on f
   const scan = await waitForScanReady(started.scanId, 5000);
 
   assert.ok(scan);
-  assert.equal(scan.status, "ready");
-  assert.equal(scan.discovered.length, 4);
-  assert.equal(probeEvents.navigatedPrimaryFrameAway, false);
-  assert.equal(probeEvents.openedSiblingFrame, true);
+  assert.strictEqual(scan.status, "ready");
+  assert.strictEqual(scan.discovered.length, 4);
+  assert.strictEqual(probeEvents.navigatedPrimaryFrameAway, false);
+  assert.strictEqual(probeEvents.openedSiblingFrame, true);
   assert.ok(probeEvents.closedSiblingProbeId);
 
   const firstStepped = scan.discovered.find((item) => item.itemIndex === 1);
   const linked = scan.discovered.find((item) => item.itemIndex === 2);
   const afterLinked = scan.discovered.find((item) => item.itemIndex === 3);
 
-  assert.equal(
+  assert.strictEqual(
     firstStepped?.url,
     "https://media.example.net/sidebar-0/playlist.m3u8",
   );
 
-  assert.equal(linked?.title, "1.3 Live Architecture Review");
+  assert.strictEqual(linked?.title, "1.3 Live Architecture Review");
 
-  assert.equal(
+  assert.strictEqual(
     afterLinked?.url,
     "https://media.example.net/sidebar-2/playlist.m3u8",
   );
 
-  assert.equal(harness.calls.windowsCreated.length, 0);
-  assert.equal(harness.calls.tabsCreated.length, 1);
+  assert.strictEqual(harness.calls.windowsCreated.length, 0);
+  assert.strictEqual(harness.calls.tabsCreated.length, 1);
 });

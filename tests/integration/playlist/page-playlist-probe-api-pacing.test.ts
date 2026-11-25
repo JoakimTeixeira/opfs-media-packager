@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import { encodeDeflatedEnvelope } from "./__mocks__/page-playlist-probe-environment.ts";
 import { createProbeSandbox } from "./__mocks__/page-playlist-probe-sandbox.ts";
 
@@ -45,12 +44,12 @@ test("serializes and paces API-route requests (max 1 in-flight) and honors Retry
 
   const result = await sandbox.runBatchProbe(lessons);
 
-  assert.equal(flight.max, 1);
-  assert.equal(result.rateLimited, false);
-  assert.equal(result.unresolvedIndices.length, 0);
-  assert.equal(result.discovered.size, 35);
+  assert.strictEqual(flight.max, 1);
+  assert.strictEqual(result.rateLimited, false);
+  assert.strictEqual(result.unresolvedIndices.length, 0);
+  assert.strictEqual(result.discovered.size, 35);
 
-  assert.equal(
+  assert.strictEqual(
     result.discovered.get(34)?.url,
     "https://media.example.net/video-7499",
   );

@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import {
   type MessageSender,
   EXT_ID,
@@ -95,10 +94,10 @@ test("Stops immediately on rateLimited:true without escalating to Tier 1.5 hidde
   const scan = await waitForScanReady(started.scanId);
 
   assert.ok(scan);
-  assert.equal(scan.status, "ready");
-  assert.equal(scan.rateLimited, true);
-  assert.equal(scan.discovered.length, 1);
-  assert.equal(escalation.hiddenIframeRequested, false);
-  assert.equal(harness.calls.windowsCreated.length, 0);
-  assert.equal(harness.calls.tabsCreated.length, 1);
+  assert.strictEqual(scan.status, "ready");
+  assert.strictEqual(scan.rateLimited, true);
+  assert.strictEqual(scan.discovered.length, 1);
+  assert.strictEqual(escalation.hiddenIframeRequested, false);
+  assert.strictEqual(harness.calls.windowsCreated.length, 0);
+  assert.strictEqual(harness.calls.tabsCreated.length, 1);
 });

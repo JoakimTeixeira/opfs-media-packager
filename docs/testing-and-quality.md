@@ -6,17 +6,17 @@ New or changed test names should start with `should` and describe one observable
 
 ## Test layers
 
-| Layer       | Command                    | What it proves                                                                                           |
-| ----------- | -------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Unit        | `npm run test:unit`        | Checks individual `lib/` behaviours. Some tests supply mock browser objects or request functions.        |
-| Integration | `npm run test:integration` | Several modules work together with a local server and mocked Chrome APIs.                                |
-| Contract    | `npm run test:contract`    | Built files, manifest entries, HTML pages, documentation limits, and security expectations remain valid. |
-| Browser     | `npm run test:e2e`         | A real Chromium extension flow works with Playwright.                                                    |
-| Mutation    | `npm run test:mutation`    | Tests detect intentional small code changes, such as a reversed condition.                               |
+| Layer       | Command                    | What it proves                                                                                               |
+| ----------- | -------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Unit        | `npm run test:unit`        | Checks individual `lib/` and `src/` behaviours. Some tests supply mock browser objects or request functions. |
+| Integration | `npm run test:integration` | Several modules work together with a local server and mocked Chrome APIs.                                    |
+| Contract    | `npm run test:contract`    | Built files, manifest entries, HTML pages, documentation limits, and security expectations remain valid.     |
+| Browser     | `npm run test:e2e`         | A real Chromium extension flow works with Playwright.                                                        |
+| Mutation    | `npm run test:mutation`    | Tests detect intentional small code changes, such as a reversed condition.                                   |
 
 The test pyramid keeps most tests fast at the unit layer. Integration and browser tests cover the connections that unit tests cannot observe. Mutation testing checks whether the tests would catch common implementation mistakes.
 
-Each TypeScript source file in `lib/` and `src/` has a colocated test file, run with Vitest. Cross-module tests live in feature folders under `tests/integration/` and run with Node.js. Browser flows live in feature folders under `tests/e2e/` and run with Playwright. `tests/contract/` checks packaging, security, and documentation agreements, while `tests/architecture/` checks dependency boundaries. Coverage and mutation runs use the Vitest unit tests.
+Each TypeScript source file in `lib/` and `src/` has a colocated test file, run with Vitest. Cross-module tests live in feature folders under `tests/integration/`; contract tests under `tests/contract/` check packaging, security, and documentation agreements, while `tests/architecture/` checks dependency boundaries. All these test files run with Vitest. Browser flows live in `tests/e2e/` and run with Playwright. Coverage and mutation runs also use Vitest.
 
 Feature-specific `__fixtures__/` folders hold prepared test inputs. Feature-specific `__mocks__/` folders hold simulated dependencies, such as the playlist scan's mocked Chrome APIs. Shared browser lifecycle helpers live in `tests/e2e/support/`. These helpers use explicit imports; folder names do not enable automatic mocking in this project.
 
@@ -37,20 +37,20 @@ Each source module owns its matching unit test file. Source-page tests replace b
 
 ## Required checks
 
-| Command                      | Purpose                                                                                                                   |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
-| `npm ci`                     | Install exactly the dependency versions recorded in `package-lock.json`.                                                  |
-| `npm run build`              | Bundle every extension entry file and confirm browser pages reference existing files.                                     |
-| `npm run format:check`       | Verify consistent formatting with Prettier.                                                                               |
-| `npm run lint`               | Run ESLint and HTMLHint. Any warning fails the command.                                                                   |
-| `npm run typecheck`          | Run strict TypeScript checks.                                                                                             |
-| `npm test`                   | Run Vitest unit tests and Node.js integration, contract, and architecture tests.                                          |
-| `npm run coverage:check`     | Require 100% line coverage, at least 96% branch coverage, and at least 97% function coverage for `lib/`.                  |
-| `npm run test:e2e`           | Run the real Chromium extension workflow. Run `npm run setup:e2e` once when Playwright's browser is missing.              |
-| `npm run test:mutation`      | Run Stryker against the modules listed in `stryker.config.mjs`. The configured score threshold is 100%.                   |
-| `npm run check:quality`      | Reject duplicated production code and unused code.                                                                        |
-| `npm run check:architecture` | Check selected browser-global access and library dependencies on browser entry points.                                    |
-| `npm run verify`             | Run build, formatting, lint, quality, type checks, Node tests, coverage and browser tests. Run mutation tests separately. |
+| Command                      | Purpose                                                                                                                     |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `npm ci`                     | Install exactly the dependency versions recorded in `package-lock.json`.                                                    |
+| `npm run build`              | Bundle every extension entry file and confirm browser pages reference existing files.                                       |
+| `npm run format:check`       | Verify consistent formatting with Prettier.                                                                                 |
+| `npm run lint`               | Run ESLint and HTMLHint. Any warning fails the command.                                                                     |
+| `npm run typecheck`          | Run strict TypeScript checks.                                                                                               |
+| `npm test`                   | Run all unit, integration, contract, and architecture tests with Vitest.                                                    |
+| `npm run coverage:check`     | Require 100% line coverage, at least 96% branch coverage, and at least 97% function coverage for `lib/`.                    |
+| `npm run test:e2e`           | Run the real Chromium extension workflow. Run `npm run setup:e2e` once when Playwright's browser is missing.                |
+| `npm run test:mutation`      | Run Stryker against the modules listed in `stryker.config.mjs`. The configured score threshold is 100%.                     |
+| `npm run check:quality`      | Reject duplicated production code and unused code.                                                                          |
+| `npm run check:architecture` | Check selected browser-global access and library dependencies on browser entry points.                                      |
+| `npm run verify`             | Run build, formatting, lint, quality, type checks, Vitest tests, coverage and browser tests. Run mutation tests separately. |
 
 ## Test design rules
 

@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import { fromVmRealm } from "./__mocks__/page-playlist-probe-environment.ts";
 import { createProbeSandbox } from "./__mocks__/page-playlist-probe-sandbox.ts";
 
@@ -149,9 +148,9 @@ test("keeps probing 1-hop supplementary event links on lessons that already have
     },
   ]);
 
-  assert.deepEqual(fromVmRealm(result.unresolvedIndices), [0]);
+  assert.deepStrictEqual(fromVmRealm(result.unresolvedIndices), [0]);
 
-  assert.deepEqual(fromVmRealm(result.unresolvedLinkLists["0"]), [
+  assert.deepStrictEqual(fromVmRealm(result.unresolvedLinkLists["0"]), [
     live1Url,
     live2Url,
   ]);
@@ -160,12 +159,12 @@ test("keeps probing 1-hop supplementary event links on lessons that already have
 
   assert.ok(partial);
 
-  assert.equal(
+  assert.strictEqual(
     partial.mediaUrl,
     "https://media.example.net/main-5002/hls/playlist.m3u8",
   );
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     fromVmRealm((partial.subtitles || []).map((track) => track.url)),
     ["https://training.example/media_transcripts/607349.vtt"],
   );
@@ -202,7 +201,7 @@ test("keeps probing 1-hop supplementary event links on lessons that already have
 
   assert.ok(directStreamPost);
 
-  assert.equal(
+  assert.strictEqual(
     (
       directStreamPost.data as {
         readonly stream?: { readonly mediaUrl?: string };

@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import {
   harness,
   makeApiLessons,
@@ -62,7 +61,7 @@ test("open-course-download includes materials-only and subtitle-only lessons in 
     extSender,
   );
 
-  assert.equal(videosRes?.ok, true);
+  assert.strictEqual(videosRes?.ok, true);
 
   const videosId = new URL(harness.calls.tabsCreated[0].url).searchParams.get(
     "playlist",
@@ -73,7 +72,7 @@ test("open-course-download includes materials-only and subtitle-only lessons in 
     extSender,
   );
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     videosTaken?.playlistDownload?.items.map((item) => item.itemIndex),
     [1],
   );
@@ -87,7 +86,7 @@ test("open-course-download includes materials-only and subtitle-only lessons in 
     extSender,
   );
 
-  assert.equal(materialsRes?.ok, true);
+  assert.strictEqual(materialsRes?.ok, true);
 
   const materialsId = new URL(
     harness.calls.tabsCreated[1].url,
@@ -98,7 +97,7 @@ test("open-course-download includes materials-only and subtitle-only lessons in 
     extSender,
   );
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     materialsTaken?.playlistDownload?.items.map((item) => item.itemIndex),
     [0],
   );
@@ -108,7 +107,7 @@ test("open-course-download includes materials-only and subtitle-only lessons in 
     extSender,
   );
 
-  assert.equal(allRes?.ok, true);
+  assert.strictEqual(allRes?.ok, true);
 
   const allId = new URL(harness.calls.tabsCreated[2].url).searchParams.get(
     "playlist",
@@ -119,7 +118,7 @@ test("open-course-download includes materials-only and subtitle-only lessons in 
     extSender,
   );
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     allTaken?.playlistDownload?.items.map((item) => item.itemIndex),
     [0, 1],
   );

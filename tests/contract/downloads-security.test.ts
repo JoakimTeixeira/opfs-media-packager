@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import { readdir, readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -76,7 +75,7 @@ test("should keep page-originated data behind a validated message and URL bounda
   );
 
   assert.match(downloadDisplay, /function userError/);
-  assert.doesNotMatch(app, /setStatus\("Download failed", error\.message\)/);
+  assert.notMatch(app, /setStatus\("Download failed", error\.message\)/);
 
   assert.match(
     app,
@@ -97,11 +96,11 @@ test("should keep page-originated data behind a validated message and URL bounda
 
   assert.match(queuePolicy, /export function shouldHaltPlaylistQueue/);
   assert.match(app, /async function runSinglePlaylistItem/);
-  assert.doesNotMatch(popup, /if \(result\?\.error\)/);
+  assert.notMatch(popup, /if \(result\?\.error\)/);
   assert.match(popup, /if \(!result\?\.ok\)/);
   assert.match(popup, /window\.addEventListener\("error"/);
   assert.match(popup, /window\.addEventListener\("unhandledrejection"/);
-  assert.doesNotMatch(course, /if \(result\?\.error\)/);
+  assert.notMatch(course, /if \(result\?\.error\)/);
   assert.match(course, /if \(!result\?\.ok\)/);
   assert.match(course, /window\.addEventListener\("error"/);
   assert.match(course, /window\.addEventListener\("unhandledrejection"/);
@@ -116,7 +115,7 @@ test("should keep page-originated data behind a validated message and URL bounda
     /if \(linked\.rateLimited\) return RATE_LIMITED_PROBE_RESULT/,
   );
 
-  assert.equal(
+  assert.strictEqual(
     pageCourseProbe.match(/rateLimited:\s*outcome\.rateLimited/g)?.length,
     3,
   );
@@ -139,20 +138,20 @@ test("should keep page-originated data behind a validated message and URL bounda
 
   const slidesFnEnd = background.indexOf("function handleAsyncExport");
 
-  assert.notEqual(diagramFnStart, -1);
-  assert.notEqual(diagramFnEnd, -1);
-  assert.notEqual(slidesFnStart, -1);
-  assert.notEqual(slidesFnEnd, -1);
+  assert.notStrictEqual(diagramFnStart, -1);
+  assert.notStrictEqual(diagramFnEnd, -1);
+  assert.notStrictEqual(slidesFnStart, -1);
+  assert.notStrictEqual(slidesFnEnd, -1);
 
   const diagramFnBody = background.slice(diagramFnStart, diagramFnEnd);
   const slidesFnBody = background.slice(slidesFnStart, slidesFnEnd);
 
-  assert.doesNotMatch(
+  assert.notMatch(
     diagramFnBody,
     /openMinimizedWorkerTab|chrome\.windows\.create/,
   );
 
-  assert.doesNotMatch(
+  assert.notMatch(
     slidesFnBody,
     /openMinimizedWorkerTab|chrome\.windows\.create|captureVisibleTab/,
   );
@@ -185,6 +184,7 @@ const ALLOWED_PUBLIC_INTEGRATION_HOSTS = new Set([
   "link.excalidraw.com",
   "e2e.excalidraw.com",
   "notexcalidraw.com",
+  "json.schemastore.org",
 ]);
 
 const ALLOWED_SYNTHETIC_HOST_EXACT = new Set([
@@ -279,7 +279,7 @@ test("should prevent else-branch and nested-ternary cognitive complexity regress
     for (const [index, line] of lines.entries()) {
       if (/^\s*\/\//.test(line) || /^\s*\*/.test(line)) continue;
 
-      assert.doesNotMatch(
+      assert.notMatch(
         line,
         /\belse\b/,
         `Unexpected else branch at ${relative}:${index + 1}`,
@@ -292,7 +292,7 @@ test("should prevent else-branch and nested-ternary cognitive complexity regress
         .replace(/"(?:\\.|[^"\\\n])*"/g, "")
         .replace(/'(?:\\.|[^'\\\n])*'/g, "");
 
-      assert.doesNotMatch(
+      assert.notMatch(
         stripped,
         /^\s*:\s+.*\?/,
         `Nested ternary continuation at ${relative}:${index + 1}`,

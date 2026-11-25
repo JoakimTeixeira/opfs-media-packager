@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import { fromVmRealm } from "./__mocks__/page-playlist-probe-environment.ts";
 import { createProbeSandbox } from "./__mocks__/page-playlist-probe-sandbox.ts";
 
@@ -221,23 +220,23 @@ test("merges single-hop child post video, Markdown, and materials in Tier 1 with
     },
   ]);
 
-  assert.deepEqual(fromVmRealm(result.unresolvedIndices), []);
+  assert.deepStrictEqual(fromVmRealm(result.unresolvedIndices), []);
 
   const apiResolved = result.discovered.get(0);
 
-  assert.equal(
+  assert.strictEqual(
     apiResolved?.mediaUrl,
     "https://media.example.net/child-902/master.m3u8",
   );
 
-  assert.equal(apiResolved?.documents?.pdfs.length, 1);
+  assert.strictEqual(apiResolved?.documents?.pdfs.length, 1);
 
-  assert.equal(
+  assert.strictEqual(
     apiResolved?.documents?.pdfs[0]?.url,
     "https://assets.example.net/child-guide.pdf",
   );
 
-  assert.equal(apiResolved?.documents?.extraNotes?.length, 1);
+  assert.strictEqual(apiResolved?.documents?.extraNotes?.length, 1);
 
   assert.ok(
     apiResolved?.documents?.extraNotes?.[0]?.markdown.includes(
@@ -253,8 +252,8 @@ test("merges single-hop child post video, Markdown, and materials in Tier 1 with
 
   const htmlResolved = result.discovered.get(1);
 
-  assert.equal(htmlResolved?.mediaUrl, "");
-  assert.equal(htmlResolved?.documents?.extraNotes?.length, 1);
+  assert.strictEqual(htmlResolved?.mediaUrl, "");
+  assert.strictEqual(htmlResolved?.documents?.extraNotes?.length, 1);
 
   assert.ok(
     htmlResolved?.documents?.extraNotes?.[0]?.markdown.includes(
@@ -262,7 +261,7 @@ test("merges single-hop child post video, Markdown, and materials in Tier 1 with
     ),
   );
 
-  assert.equal(
+  assert.strictEqual(
     fetchedUrls.some((url) => url.includes("grandchild-never-fetch")),
     false,
   );

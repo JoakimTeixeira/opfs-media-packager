@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import { encodeDeflatedEnvelope } from "./__mocks__/page-playlist-probe-environment.ts";
 import { createProbeSandbox } from "./__mocks__/page-playlist-probe-sandbox.ts";
 
@@ -34,14 +33,14 @@ test("trips the 429 circuit breaker on persistent throttling, stops remaining fe
 
   const result = await sandbox.runBatchProbe(lessons);
 
-  assert.equal(result.rateLimited, true);
-  assert.equal(result.discovered.size, 1);
-  assert.equal(result.unresolvedIndices.length, 9);
+  assert.strictEqual(result.rateLimited, true);
+  assert.strictEqual(result.discovered.size, 1);
+  assert.strictEqual(result.unresolvedIndices.length, 9);
   // Lesson 1 succeeded (1 fetch), lesson 2 failed twice with 429 (2 fetches) -> circuit tripped!
-  assert.equal(requestedUrls.length, 3);
+  assert.strictEqual(requestedUrls.length, 3);
 
   // Never fetched SPA HTML pages after hitting 429.
-  assert.equal(
+  assert.strictEqual(
     requestedUrls.some((url) => url.includes("/conteudos")),
     false,
   );

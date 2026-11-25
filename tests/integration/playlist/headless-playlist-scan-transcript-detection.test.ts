@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import {
   harness,
   extSender,
@@ -100,8 +99,8 @@ test("list-detections recovers eager page transcript VTTs, ignores storyboard mo
     }[];
   };
 
-  assert.equal(listed?.streams?.length, 1);
-  assert.equal(listed?.subtitles?.length, 1);
-  assert.equal(listed?.subtitles?.[0]?.url, transcriptUrl);
-  assert.equal(listed?.subtitles?.[0]?.language, "Portuguese");
+  assert.strictEqual(listed?.streams?.length, 1);
+  assert.strictEqual(listed?.subtitles?.length, 1);
+  assert.strictEqual(listed?.subtitles?.[0]?.url, transcriptUrl);
+  assert.strictEqual(listed?.subtitles?.[0]?.language, "Portuguese");
 });

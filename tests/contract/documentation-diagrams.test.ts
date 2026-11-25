@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { assert, test } from "vitest";
 import { readFile, readdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { extname, join } from "node:path";
@@ -51,15 +50,15 @@ function diagramStructureErrors(markdown: string): string[] {
 }
 
 test("should detect unclosed fences and diagram statements outside Markdown fences", () => {
-  assert.deepEqual(diagramStructureErrors("```mermaid\nflowchart TD\n"), [
+  assert.deepStrictEqual(diagramStructureErrors("```mermaid\nflowchart TD\n"), [
     "Unclosed code fence at line 1",
   ]);
 
-  assert.deepEqual(diagramStructureErrors("Page --> Service\n"), [
+  assert.deepStrictEqual(diagramStructureErrors("Page --> Service\n"), [
     "Diagram statement outside a code fence at line 1",
   ]);
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     diagramStructureErrors("```mermaid\nflowchart TD\nPage --> Service\n```\n"),
     [],
   );
@@ -84,7 +83,7 @@ test("should keep Markdown fences closed and diagram statements inside code fenc
   ];
 
   for (const path of paths) {
-    assert.deepEqual(
+    assert.deepStrictEqual(
       diagramStructureErrors(await readFile(path, "utf8")),
       [],
       path,

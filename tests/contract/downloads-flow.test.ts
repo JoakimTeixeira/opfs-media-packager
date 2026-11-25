@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import { readFile } from "node:fs/promises";
 
 interface ManifestContentScript {
@@ -34,11 +33,11 @@ test("should schedule downloads without a per-download picker", async () => {
     /downloadRelativePath\(\s*currentDownloadSubfolder\(\),\s*outputName,?\s*\)/,
   );
 
-  assert.doesNotMatch(source, /showDirectoryPicker/);
-  assert.doesNotMatch(source, /showSaveFilePicker/);
+  assert.notMatch(source, /showDirectoryPicker/);
+  assert.notMatch(source, /showSaveFilePicker/);
   const popup = await readFile(new URL("src/popup.ts", root), "utf8");
 
-  assert.doesNotMatch(popup, /chrome:\/\/settings\/downloads/);
+  assert.notMatch(popup, /chrome:\/\/settings\/downloads/);
 });
 
 test("should schedule a matching MP4 subtitle without a second picker", async () => {
@@ -57,8 +56,8 @@ test("should schedule a matching MP4 subtitle without a second picker", async ()
     /saveBrowserDownload\(contents, subtitleName, "text\/vtt"\)/,
   );
 
-  assert.doesNotMatch(source, /saveSubtitleInDownloads/);
-  assert.doesNotMatch(background, /chrome\.downloads\.download/);
+  assert.notMatch(source, /saveSubtitleInDownloads/);
+  assert.notMatch(background, /chrome\.downloads\.download/);
 
   assert.match(
     source,
@@ -84,7 +83,7 @@ test("should use a conventional FFmpeg MP4 remux instead of Media Source fragmen
   assert.match(source, /ffmpeg\.mountOpfs\(/);
   assert.match(source, /ffmpeg\.unmountOpfs\(/);
   assert.match(source, /type: "set-download-tab-keepalive"/);
-  assert.doesNotMatch(source, /createMp4Remuxer/);
+  assert.notMatch(source, /createMp4Remuxer/);
 
   const background = await readFile(new URL("src/background.ts", root), "utf8");
 
@@ -123,11 +122,11 @@ test("should ship bundled popup, downloader, and course scripts with no bare mod
   const indexHtml = await readFile(new URL("src/index.html", root), "utf8");
   const courseHtml = await readFile(new URL("src/playlist.html", root), "utf8");
 
-  assert.equal(manifest.action.default_popup, "src/popup.html");
-  assert.equal(manifest.background.service_worker, "dist/background.js");
-  assert.deepEqual(manifest.content_scripts[0]?.js, ["dist/content.js"]);
+  assert.strictEqual(manifest.action.default_popup, "src/popup.html");
+  assert.strictEqual(manifest.background.service_worker, "dist/background.js");
+  assert.deepStrictEqual(manifest.content_scripts[0]?.js, ["dist/content.js"]);
 
-  assert.deepEqual(manifest.content_scripts[1]?.js, [
+  assert.deepStrictEqual(manifest.content_scripts[1]?.js, [
     "dist/page-playlist-probe.js",
   ]);
 
@@ -140,8 +139,8 @@ test("should ship bundled popup, downloader, and course scripts with no bare mod
 
   assert.ok(popupBundle.length > 5000);
   assert.ok(appBundle.length > 10000);
-  assert.doesNotMatch(popupBundle, /from\s+["']lucide["']/);
-  assert.doesNotMatch(appBundle, /from\s+["']lucide["']/);
+  assert.notMatch(popupBundle, /from\s+["']lucide["']/);
+  assert.notMatch(appBundle, /from\s+["']lucide["']/);
 });
 
 test("should hand off the preferred format and start the download immediately", async () => {
@@ -162,7 +161,7 @@ test("should hand off the preferred format and start the download immediately", 
     /copyUrl\.replaceChildren\(icon\("check", \["icon"\]\)\)/,
   );
 
-  assert.doesNotMatch(popup, /Source playlist/);
+  assert.notMatch(popup, /Source playlist/);
   assert.match(popup, /quality\.className = "quality"/);
   assert.match(popup, /qualityOptions/);
   assert.match(app, /suppliedQualityChoices/);
@@ -188,9 +187,9 @@ test("should keep course scanning headless without main-window tab fallbacks or 
   assert.ok(manifest.permissions.includes("alarms"));
   assert.ok(manifest.content_scripts[0]?.all_frames);
   assert.ok(manifest.content_scripts[1]?.all_frames);
-  assert.equal(manifest.content_scripts[1]?.world, "MAIN");
-  assert.equal(manifest.content_scripts[1]?.matches[0], "https://*/courses/*");
-  assert.equal(manifest.web_accessible_resources, undefined);
+  assert.strictEqual(manifest.content_scripts[1]?.world, "MAIN");
+  assert.strictEqual(manifest.content_scripts[1]?.matches[0], "https://*/courses/*");
+  assert.strictEqual(manifest.web_accessible_resources, undefined);
 
   // Tier 1 + Tier 1.5 hidden iframe + Tier 2 minimized popup contracts
   assert.match(background, /ensureMainWorldProbeInjected/);
@@ -199,17 +198,17 @@ test("should keep course scanning headless without main-window tab fallbacks or 
   assert.match(background, /openMinimizedWorkerTab/);
   assert.match(background, /state: "minimized"/);
 
-  assert.doesNotMatch(
+  assert.notMatch(
     backgroundCode,
     /state:\s*"minimized"[\s\S]{0,120}focused:\s*false|focused:\s*false[\s\S]{0,120}state:\s*"minimized"/,
   );
 
-  assert.doesNotMatch(background, /chrome\.tabs\.hide/);
+  assert.notMatch(background, /chrome\.tabs\.hide/);
   assert.match(content, /open-hidden-probe-frame/);
   assert.match(content, /hidden-probe-frame-ready/);
   assert.match(content, /close-hidden-probe-frame/);
   assert.match(courseProbe, /__opfsMediaPackagerProbeLoaded/);
   assert.match(courseProbe, /fetchApiPlaylistWithBackoff/);
   assert.match(courseProbe, /DecompressionStream\("deflate"\)/);
-  assert.doesNotMatch(courseProbe, /JSON\.parse =/);
+  assert.notMatch(courseProbe, /JSON\.parse =/);
 });

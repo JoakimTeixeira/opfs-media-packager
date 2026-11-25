@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import {
   type MessageSender,
   EXT_ID,
@@ -111,12 +110,12 @@ test("Tier 1 headless scan resolves all 35 lessons with 0 tabs/windows, retries 
   const scan = await waitForScanReady(started.scanId);
 
   assert.ok(scan);
-  assert.equal(scan.status, "ready");
-  assert.equal(scan.discovered.length, 35);
-  assert.equal(scan.discovered[0].subtitles[0].language, "Portuguese");
-  assert.notEqual(scan.discovered[0].subtitles[0].language, "Subtitle");
-  assert.equal(harness.calls.windowsCreated.length, 0);
+  assert.strictEqual(scan.status, "ready");
+  assert.strictEqual(scan.discovered.length, 35);
+  assert.strictEqual(scan.discovered[0].subtitles[0].language, "Portuguese");
+  assert.notStrictEqual(scan.discovered[0].subtitles[0].language, "Subtitle");
+  assert.strictEqual(harness.calls.windowsCreated.length, 0);
   // Only playlist.html tab was opened; zero lesson tabs!
-  assert.equal(harness.calls.tabsCreated.length, 1);
+  assert.strictEqual(harness.calls.tabsCreated.length, 1);
   assert.match(harness.calls.tabsCreated[0].url, /playlist\.html\?scan=/);
 });

@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import {
   stringField,
   EXT_ID,
@@ -161,16 +160,16 @@ test("Tier 1.5 stops at 1-hop for linked non-video child posts, skips self/dupli
   const scan = await waitForScanReady(started.scanId, 12000);
 
   assert.ok(scan);
-  assert.equal(scan.status, "ready");
-  assert.equal(scan.nextItemIndex, 1);
-  assert.deepEqual(openedFrameUrls, [childPostUrl]);
-  assert.equal(childFinderCalled.value, false);
-  assert.equal(scan.discovered.length, 1);
+  assert.strictEqual(scan.status, "ready");
+  assert.strictEqual(scan.nextItemIndex, 1);
+  assert.deepStrictEqual(openedFrameUrls, [childPostUrl]);
+  assert.strictEqual(childFinderCalled.value, false);
+  assert.strictEqual(scan.discovered.length, 1);
 
   const entry = scan.discovered[0];
 
-  assert.equal(entry.title, "1.3 Linked Non - Video Child");
-  assert.equal(entry.url, "");
+  assert.strictEqual(entry.title, "1.3 Linked Non - Video Child");
+  assert.strictEqual(entry.url, "");
 
   assert.ok(
     entry.documents?.markdown.includes(
@@ -178,14 +177,14 @@ test("Tier 1.5 stops at 1-hop for linked non-video child posts, skips self/dupli
     ),
   );
 
-  assert.equal(entry.documents?.pdfs.length, 1);
+  assert.strictEqual(entry.documents?.pdfs.length, 1);
 
-  assert.equal(
+  assert.strictEqual(
     entry.documents?.pdfs[0]?.url,
     "https://assets.example.net/child-handout.pdf",
   );
 
-  assert.equal(entry.documents?.extraNotes?.length, 1);
+  assert.strictEqual(entry.documents?.extraNotes?.length, 1);
 
   assert.ok(
     entry.documents?.extraNotes?.[0]?.markdown.includes(

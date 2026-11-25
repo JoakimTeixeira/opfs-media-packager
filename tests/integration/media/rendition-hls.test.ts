@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import { createMediaRequest } from "../../../lib/media/media-request.ts";
 import { parseHlsMaster } from "../../../lib/media/hls-master.ts";
 
@@ -28,8 +27,8 @@ test("should integrate a referrer-aware master response into a quality ladder", 
     sourcePageUrl: lessonUrl,
   });
 
-  assert.equal(requestInit.referrerPolicy, "unsafe-url");
-  assert.equal(requestInit.referrer, lessonUrl);
+  assert.strictEqual(requestInit.referrerPolicy, "unsafe-url");
+  assert.strictEqual(requestInit.referrer, lessonUrl);
 
   const respond = (init: RequestInit): Response => {
     const referrer = init.referrer ?? "";
@@ -54,14 +53,14 @@ test("should integrate a referrer-aware master response into a quality ladder", 
     referrerPolicy: "strict-origin-when-cross-origin",
   });
 
-  assert.equal(originOnly.status, 403);
+  assert.strictEqual(originOnly.status, 403);
 
   const authorized = respond(requestInit);
 
-  assert.equal(authorized.status, 200);
+  assert.strictEqual(authorized.status, 200);
   const parsed = parseHlsMaster(await authorized.text(), mediaUrl);
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     parsed.qualityOptions.map((option) => option.label),
     [
       "1080p (1920×1080)",

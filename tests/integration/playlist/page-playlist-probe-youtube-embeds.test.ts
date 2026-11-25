@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import { fromVmRealm } from "./__mocks__/page-playlist-probe-environment.ts";
 import { createProbeSandbox } from "./__mocks__/page-playlist-probe-sandbox.ts";
 
@@ -242,15 +241,15 @@ test("resolves YouTube embed lessons in Tier 1, preserves partial materials acro
   );
 
   // Disabled AI transcript WITH explicit webvtt_file_url is preserved.
-  assert.deepEqual(
+  assert.deepStrictEqual(
     [...(result.discovered.get(3)?.subtitles || [])].map((track) => track.url),
     ["https://assets.example.net/ai-1348709"],
   );
 
   // Both SPA post + YouTube lesson (802) and multi-post lesson (803) are in unresolvedIndices with partial materials preserved!
-  assert.deepEqual(fromVmRealm(result.unresolvedIndices), [1, 2]);
+  assert.deepStrictEqual(fromVmRealm(result.unresolvedIndices), [1, 2]);
 
-  assert.equal(
+  assert.strictEqual(
     result.unresolvedLinks["1"],
     "https://training.example/c/community/sample-workshop-post",
   );
@@ -263,7 +262,7 @@ test("resolves YouTube embed lessons in Tier 1, preserves partial materials acro
       ),
   );
 
-  assert.deepEqual(fromVmRealm(result.unresolvedLinkLists["2"]), [
+  assert.deepStrictEqual(fromVmRealm(result.unresolvedLinkLists["2"]), [
     "https://training.example/c/events/reading-group-patterns",
     "https://training.example/c/community-lessons/sample-lesson",
     "https://training.example/c/notes/pattern-notes",
@@ -272,7 +271,7 @@ test("resolves YouTube embed lessons in Tier 1, preserves partial materials acro
   const multiPartial = result.partialLessons.get(2)?.documents;
 
   assert.ok(multiPartial);
-  assert.equal(multiPartial.images.length, 3);
+  assert.strictEqual(multiPartial.images.length, 3);
 
   assert.ok(
     multiPartial.markdown.includes(
@@ -310,7 +309,7 @@ test("resolves YouTube embed lessons in Tier 1, preserves partial materials acro
 
   assert.ok(subtitlePost);
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     fromVmRealm(
       (
         subtitlePost.data as {

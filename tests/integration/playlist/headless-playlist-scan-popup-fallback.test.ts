@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import {
   stringField,
   probeLessons,
@@ -66,11 +65,11 @@ test("Tier 2 fallback opens minimized popup WITHOUT focused property and NEVER f
 
   // Give async Tier 1 -> Tier 1.5 -> Tier 2 transition a tick to run
   await new Promise<void>((r) => setTimeout(r, 120));
-  assert.equal(harness.calls.windowsCreated.length, 1);
-  assert.equal(harness.calls.windowsCreated[0].state, "minimized");
-  assert.equal(harness.calls.windowsCreated[0].type, "popup");
-  assert.equal("focused" in harness.calls.windowsCreated[0], false);
+  assert.strictEqual(harness.calls.windowsCreated.length, 1);
+  assert.strictEqual(harness.calls.windowsCreated[0].state, "minimized");
+  assert.strictEqual(harness.calls.windowsCreated[0].type, "popup");
+  assert.strictEqual("focused" in harness.calls.windowsCreated[0], false);
   // Only playlist.html was created via chrome.tabs.create — zero lesson tabs in main window!
-  assert.equal(harness.calls.tabsCreated.length, 1);
+  assert.strictEqual(harness.calls.tabsCreated.length, 1);
   assert.match(harness.calls.tabsCreated[0].url, /playlist\.html\?scan=/);
 });

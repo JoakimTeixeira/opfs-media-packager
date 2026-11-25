@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import { fromVmRealm } from "./__mocks__/page-playlist-probe-environment.ts";
 import { createProbeSandbox } from "./__mocks__/page-playlist-probe-sandbox.ts";
 
@@ -161,12 +160,12 @@ test("extracts rich_text_body materials for video and materials-only lessons", a
     },
   ]);
 
-  assert.equal(result.unresolvedIndices.length, 0);
+  assert.strictEqual(result.unresolvedIndices.length, 0);
 
   const materialsOnly = result.discovered.get(0);
 
-  assert.equal(materialsOnly?.url, "");
-  assert.equal(materialsOnly?.mediaUrl, "");
+  assert.strictEqual(materialsOnly?.url, "");
+  assert.strictEqual(materialsOnly?.mediaUrl, "");
   assert.ok(materialsOnly?.documents);
 
   assert.match(
@@ -174,7 +173,7 @@ test("extracts rich_text_body materials for video and materials-only lessons", a
     /^# 1\.1 Materials Only Lesson\n\n## Key Takeaways\n\n- Top item\n {2}- Nested item\n\nRead \[Reference\]\(https:\/\/training\.example\/docs\/reference\)/,
   );
 
-  assert.deepEqual(fromVmRealm(materialsOnly.documents.pdfs), [
+  assert.deepStrictEqual(fromVmRealm(materialsOnly.documents.pdfs), [
     {
       kind: "pdf",
       url: "https://assets.example.net/pdf-blob",
@@ -183,7 +182,7 @@ test("extracts rich_text_body materials for video and materials-only lessons", a
     },
   ]);
 
-  assert.deepEqual(fromVmRealm(materialsOnly.documents.images), [
+  assert.deepStrictEqual(fromVmRealm(materialsOnly.documents.images), [
     {
       kind: "image",
       url: "https://assets.example.net/originals/diagram.png",
@@ -194,7 +193,7 @@ test("extracts rich_text_body materials for video and materials-only lessons", a
     },
   ]);
 
-  assert.deepEqual(fromVmRealm(materialsOnly.documents.diagrams), [
+  assert.deepStrictEqual(fromVmRealm(materialsOnly.documents.diagrams), [
     {
       kind: "diagram",
       url: "https://app.excalidraw.com/s/arch-map",
@@ -202,7 +201,7 @@ test("extracts rich_text_body materials for video and materials-only lessons", a
     },
   ]);
 
-  assert.deepEqual(fromVmRealm(materialsOnly.documents.slides), [
+  assert.deepStrictEqual(fromVmRealm(materialsOnly.documents.slides), [
     {
       kind: "slides",
       url: "https://slides.example/architecture?slide=9",
@@ -212,7 +211,7 @@ test("extracts rich_text_body materials for video and materials-only lessons", a
 
   const videoAndMaterials = result.discovered.get(1);
 
-  assert.equal(
+  assert.strictEqual(
     videoAndMaterials?.mediaUrl,
     "https://media.example.net/602/master.m3u8",
   );
@@ -224,8 +223,8 @@ test("extracts rich_text_body materials for video and materials-only lessons", a
     /^# 1\.2 Video And Materials Lesson\n/,
   );
 
-  assert.equal(videoAndMaterials.documents.pdfs.length, 1);
-  assert.equal(videoAndMaterials.documents.images.length, 1);
-  assert.equal(videoAndMaterials.documents.diagrams.length, 1);
-  assert.equal(videoAndMaterials.documents.slides.length, 1);
+  assert.strictEqual(videoAndMaterials.documents.pdfs.length, 1);
+  assert.strictEqual(videoAndMaterials.documents.images.length, 1);
+  assert.strictEqual(videoAndMaterials.documents.diagrams.length, 1);
+  assert.strictEqual(videoAndMaterials.documents.slides.length, 1);
 });

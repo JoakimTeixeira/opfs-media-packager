@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import {
   COURSE_ORIGIN,
   stringField,
@@ -215,22 +214,22 @@ test("Tier 1.5 discovers linked video via find-linked-video-in-page when Tier 1 
   const scan = await waitForScanReady(started.scanId, 5000);
 
   assert.ok(scan);
-  assert.equal(scan.status, "ready");
-  assert.equal(securityResults.crossOrigin?.ok, false);
-  assert.equal(securityResults.wrongTab?.ok, false);
-  assert.equal(securityResults.topFrame?.ok, false);
-  assert.equal(securityResults.unknownProbe?.ok, false);
-  assert.equal(state.findLinkedCalls, 1);
-  assert.equal(state.openedSibling, true);
-  assert.equal(state.navigatedPrimaryAway, false);
-  assert.equal(scan.discovered.length, 3);
+  assert.strictEqual(scan.status, "ready");
+  assert.strictEqual(securityResults.crossOrigin?.ok, false);
+  assert.strictEqual(securityResults.wrongTab?.ok, false);
+  assert.strictEqual(securityResults.topFrame?.ok, false);
+  assert.strictEqual(securityResults.unknownProbe?.ok, false);
+  assert.strictEqual(state.findLinkedCalls, 1);
+  assert.strictEqual(state.openedSibling, true);
+  assert.strictEqual(state.navigatedPrimaryAway, false);
+  assert.strictEqual(scan.discovered.length, 3);
 
   const linked = scan.discovered.find((item) => item.itemIndex === 1);
   const finalLesson = scan.discovered.find((item) => item.itemIndex === 2);
 
-  assert.equal(linked?.title, "1.2 Workshop Recording");
+  assert.strictEqual(linked?.title, "1.2 Workshop Recording");
 
-  assert.equal(
+  assert.strictEqual(
     finalLesson?.url,
     "https://media.example.net/lesson-2/playlist.m3u8",
   );

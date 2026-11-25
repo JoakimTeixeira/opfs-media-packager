@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import { createProbeSandbox } from "./__mocks__/page-playlist-probe-sandbox.ts";
 
 test("propagates rateLimited explicitly through linked-video HTML resolution without hammering subsequent lessons", async () => {
@@ -60,10 +59,10 @@ test("propagates rateLimited explicitly through linked-video HTML resolution wit
     },
   ]);
 
-  assert.equal(result.rateLimited, true);
-  assert.deepEqual([...result.unresolvedIndices], [0, 1]);
+  assert.strictEqual(result.rateLimited, true);
+  assert.deepStrictEqual([...result.unresolvedIndices], [0, 1]);
 
-  assert.equal(
+  assert.strictEqual(
     requestedUrls.some((url) => url.includes("203")),
     false,
   );

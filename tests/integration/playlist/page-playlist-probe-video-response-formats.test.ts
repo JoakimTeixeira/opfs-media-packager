@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import { encodeDeflatedEnvelope } from "./__mocks__/page-playlist-probe-environment.ts";
 import { createProbeSandbox } from "./__mocks__/page-playlist-probe-sandbox.ts";
 
@@ -56,12 +55,12 @@ test("decodes non-[7,12] video tipo values and rejects HTTP 200 SPA HTML fallbac
     },
   ]);
 
-  assert.equal(
+  assert.strictEqual(
     result.discovered.get(0)?.mediaUrl,
     "https://media.example.net/a1b2c3d4-e5f6-4789-abcd-ef0123456789/playlist.m3u8",
   );
 
-  assert.deepEqual([...result.unresolvedIndices], [1]);
-  assert.equal(result.discovered.has(2), true);
-  assert.equal(result.discovered.get(2), null);
+  assert.deepStrictEqual([...result.unresolvedIndices], [1]);
+  assert.strictEqual(result.discovered.has(2), true);
+  assert.strictEqual(result.discovered.get(2), null);
 });

@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import { readFile } from "node:fs/promises";
 import ts from "typescript";
 
@@ -69,16 +68,16 @@ function browserGlobalAccess(source: string): readonly string[] {
 }
 
 test("should detect browser-global access without matching comments or strings", () => {
-  assert.deepEqual(
+  assert.deepStrictEqual(
     browserGlobalAccess(
       "chrome.tabs.query({}); window.location.href; document.title;",
     ),
     ["chrome", "window", "document"],
   );
 
-  assert.deepEqual(browserGlobalAccess('const note = "chrome.tabs";'), []);
+  assert.deepStrictEqual(browserGlobalAccess('const note = "chrome.tabs";'), []);
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     browserGlobalAccess(
       'chrome["tabs"]; globalThis.chrome; globalThis["document"];',
     ),
@@ -93,7 +92,7 @@ test("should keep selected reusable rules free of direct browser-global access",
       "utf8",
     );
 
-    assert.deepEqual(browserGlobalAccess(source), [], path);
+    assert.deepStrictEqual(browserGlobalAccess(source), [], path);
   }
 });
 
@@ -192,7 +191,7 @@ test("should keep reusable modules independent of extension entry points", async
         .at(-1)
         ?.replace(/\.(?:[cm]?[jt]s)$/, "");
 
-      assert.equal(
+      assert.strictEqual(
         Boolean(target && entryPoints.has(target)),
         false,
         `${name} imports ${specifier}`,

@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import {
   COURSE_ORIGIN,
   type ApiLesson,
@@ -265,29 +264,29 @@ test("Tier 1.5 closes a linked-post firstRun frame, opens a clean course frame f
   const scan = await waitForScanReady(started.scanId, 12000);
 
   assert.ok(scan);
-  assert.equal(scan.status, "ready");
-  assert.equal(scan.nextItemIndex, 5);
-  assert.deepEqual(probeState.probeLessonFrames, [0]);
-  assert.deepEqual(probeState.openedUrls, [linkedEventUrl, playlistUrl]);
-  assert.equal(probeState.closedProbeIds.length, 2);
+  assert.strictEqual(scan.status, "ready");
+  assert.strictEqual(scan.nextItemIndex, 5);
+  assert.deepStrictEqual(probeState.probeLessonFrames, [0]);
+  assert.deepStrictEqual(probeState.openedUrls, [linkedEventUrl, playlistUrl]);
+  assert.strictEqual(probeState.closedProbeIds.length, 2);
 
-  assert.deepEqual(probeState.navigatedSections, [
+  assert.deepStrictEqual(probeState.navigatedSections, [
     "1. Introdução",
     "9. Modulo Evolutivo",
     "10. Pronto para Producao",
   ]);
 
   // Failed navigation for lesson 4 (10.1) aborted cleanly without scraping materials/direct video.
-  assert.deepEqual(probeState.extractedMaterialFrames, [0, 201, 202, 202]);
-  assert.deepEqual(probeState.collectedDirectFrames, []);
-  assert.equal(scan.discovered.length, 4);
+  assert.deepStrictEqual(probeState.extractedMaterialFrames, [0, 201, 202, 202]);
+  assert.deepStrictEqual(probeState.collectedDirectFrames, []);
+  assert.strictEqual(scan.discovered.length, 4);
 
   const lesson104 = scan.discovered.find((item) => item.itemIndex === 2);
   const lesson901 = scan.discovered.find((item) => item.itemIndex === 3);
 
-  assert.equal(lesson104?.url, sidebar104Url);
-  assert.equal(lesson104?.qualityOptions?.length, 3);
-  assert.equal(lesson104?.documents?.images.length, 0);
-  assert.equal(lesson901?.url, sidebar901Url);
-  assert.equal(lesson901?.qualityOptions?.length, 3);
+  assert.strictEqual(lesson104?.url, sidebar104Url);
+  assert.strictEqual(lesson104?.qualityOptions?.length, 3);
+  assert.strictEqual(lesson104?.documents?.images.length, 0);
+  assert.strictEqual(lesson901?.url, sidebar901Url);
+  assert.strictEqual(lesson901?.qualityOptions?.length, 3);
 });

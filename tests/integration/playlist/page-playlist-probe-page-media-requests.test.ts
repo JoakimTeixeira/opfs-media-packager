@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import { fromVmRealm } from "./__mocks__/page-playlist-probe-environment.ts";
 import { createProbeSandbox } from "./__mocks__/page-playlist-probe-sandbox.ts";
 
@@ -61,7 +60,7 @@ test("fetchMediaFromPage allows subtitle and /media_transcripts paths with appro
     "text",
   );
 
-  assert.equal(sameOrigin.status, 200);
+  assert.strictEqual(sameOrigin.status, 200);
   assert.match(sameOrigin.body, /^WEBVTT/);
 
   const externalVtt = await requestMedia(
@@ -69,7 +68,7 @@ test("fetchMediaFromPage allows subtitle and /media_transcripts paths with appro
     "text",
   );
 
-  assert.equal(externalVtt.status, 200);
+  assert.strictEqual(externalVtt.status, 200);
   assert.match(externalVtt.body, /^WEBVTT/);
 
   const blocked = await requestMedia(
@@ -77,21 +76,21 @@ test("fetchMediaFromPage allows subtitle and /media_transcripts paths with appro
     "text",
   );
 
-  assert.deepEqual(fromVmRealm(blocked), { status: 0, body: "" });
+  assert.deepStrictEqual(fromVmRealm(blocked), { status: 0, body: "" });
 
   const sameOriginBytes = await requestMedia(
     "https://training.example/media_transcripts/4242395",
     "bytes",
   );
 
-  assert.equal(sameOriginBytes.status, 200);
+  assert.strictEqual(sameOriginBytes.status, 200);
 
   assert.match(
     Buffer.from(sameOriginBytes.body, "base64").toString("utf8"),
     /^WEBVTT/,
   );
 
-  assert.deepEqual(fetchCalls, [
+  assert.deepStrictEqual(fetchCalls, [
     {
       url: "https://training.example/media_transcripts/4242395.vtt",
       credentials: "include",

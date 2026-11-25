@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import {
   stringField,
   EXT_ID,
@@ -216,35 +215,35 @@ test("Tier 1.5 captures 2 direct MP4 event recordings linked from a primary-HLS 
   const scan = await waitForScanReady(started.scanId, 12000);
 
   assert.ok(scan);
-  assert.equal(scan.status, "ready");
-  assert.equal(scan.nextItemIndex, 1);
-  assert.deepEqual(openedFrameUrls, [event1Url, event2Url]);
-  assert.equal(childFinderCalled.value, false);
-  assert.equal(scan.discovered.length, 1);
+  assert.strictEqual(scan.status, "ready");
+  assert.strictEqual(scan.nextItemIndex, 1);
+  assert.deepStrictEqual(openedFrameUrls, [event1Url, event2Url]);
+  assert.strictEqual(childFinderCalled.value, false);
+  assert.strictEqual(scan.discovered.length, 1);
 
   const entry = scan.discovered[0];
 
-  assert.equal(entry.title, "1.1 O que vai ser construido");
-  assert.equal(entry.primaryVideoTitle, "1.1 O que vai ser construido");
+  assert.strictEqual(entry.title, "1.1 O que vai ser construido");
+  assert.strictEqual(entry.primaryVideoTitle, "1.1 O que vai ser construido");
 
-  assert.equal(entry.url, "https://media.example.net/main-5001/playlist.m3u8");
+  assert.strictEqual(entry.url, "https://media.example.net/main-5001/playlist.m3u8");
 
-  assert.equal(entry.extraVideos?.length, 2);
+  assert.strictEqual(entry.extraVideos?.length, 2);
 
-  assert.equal(entry.extraVideos?.[0]?.kind, "direct");
+  assert.strictEqual(entry.extraVideos?.[0]?.kind, "direct");
 
-  assert.equal(
+  assert.strictEqual(
     entry.extraVideos?.[0]?.url,
     "https://assets.example.net/live-event-1.mp4",
   );
 
-  assert.equal(entry.extraVideos?.[1]?.kind, "direct");
+  assert.strictEqual(entry.extraVideos?.[1]?.kind, "direct");
 
-  assert.equal(
+  assert.strictEqual(
     entry.extraVideos?.[1]?.url,
     "https://assets.example.net/live-event-2.mp4",
   );
 
-  assert.equal(entry.documents?.images.length, 2);
-  assert.equal(entry.documents?.extraNotes?.length, 2);
+  assert.strictEqual(entry.documents?.images.length, 2);
+  assert.strictEqual(entry.documents?.extraNotes?.length, 2);
 });

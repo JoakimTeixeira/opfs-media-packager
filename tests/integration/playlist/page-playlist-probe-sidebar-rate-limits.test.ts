@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import { createProbeSandbox } from "./__mocks__/page-playlist-probe-sandbox.ts";
 
 test("shares rate-limit pacing (max 1 in-flight), Retry-After backoff, and 2-strike 429 circuit breaker across sidebar course adapters", async () => {
@@ -83,22 +82,22 @@ test("shares rate-limit pacing (max 1 in-flight), Retry-After backoff, and 2-str
     },
   ]);
 
-  assert.equal(flight.max, 1);
-  assert.equal(result.rateLimited, true);
+  assert.strictEqual(flight.max, 1);
+  assert.strictEqual(result.rateLimited, true);
 
-  assert.equal(
+  assert.strictEqual(
     result.discovered.get(0)?.mediaUrl,
     "https://media.example.net/102/master.m3u8",
   );
 
-  assert.deepEqual([...result.unresolvedIndices], [1, 2]);
+  assert.deepStrictEqual([...result.unresolvedIndices], [1, 2]);
   assert.ok(sandbox.scheduledDelays.some((delay) => delay >= 1900));
 
   // Lesson 102 took 2 requests (429 + 200), Lesson 103 took 2 requests (429 + 429 -> tripped),
   // and Lesson 104 was never requested ( nor was any HTML fallback attempted).
-  assert.equal(requestedUrls.length, 4);
+  assert.strictEqual(requestedUrls.length, 4);
 
-  assert.equal(
+  assert.strictEqual(
     requestedUrls.some((url) => url.includes("104")),
     false,
   );
@@ -114,6 +113,6 @@ test("shares rate-limit pacing (max 1 in-flight), Retry-After backoff, and 2-str
     },
   ]);
 
-  assert.equal(singleLessonResult.rateLimited, true);
-  assert.deepEqual([...singleLessonResult.unresolvedIndices], [0]);
+  assert.strictEqual(singleLessonResult.rateLimited, true);
+  assert.deepStrictEqual([...singleLessonResult.unresolvedIndices], [0]);
 });

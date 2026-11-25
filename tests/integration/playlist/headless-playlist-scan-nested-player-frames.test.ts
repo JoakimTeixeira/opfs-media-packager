@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import {
   type MessageSender,
   EXT_ID,
@@ -149,8 +148,8 @@ test("Tier 1.5 invisible same-origin iframe captures nested player iframe via pa
   const scan = await waitForScanReady(started.scanId);
 
   assert.ok(scan);
-  assert.equal(scan.status, "ready");
-  assert.equal(scan.discovered.length, 35);
+  assert.strictEqual(scan.status, "ready");
+  assert.strictEqual(scan.discovered.length, 35);
 
   assert.ok(
     iframeState.closedProbeId,
@@ -158,11 +157,11 @@ test("Tier 1.5 invisible same-origin iframe captures nested player iframe via pa
   );
 
   // Zero new windows and zero lesson tabs opened!
-  assert.equal(harness.calls.windowsCreated.length, 0);
-  assert.equal(harness.calls.tabsCreated.length, 1);
+  assert.strictEqual(harness.calls.windowsCreated.length, 0);
+  assert.strictEqual(harness.calls.tabsCreated.length, 1);
 
   // Main tab popup detections were NOT polluted by the hidden iframe!
-  assert.equal(
+  assert.strictEqual(
     harness.sessionStore.get(`detections:${sourceTabId}`),
     undefined,
   );

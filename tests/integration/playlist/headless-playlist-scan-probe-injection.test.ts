@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import {
   type MessageSender,
   EXT_ID,
@@ -94,16 +93,16 @@ test("Injects page-course-probe.js via chrome.scripting when Tier 1 reports prob
   const scan = await waitForScanReady(started.scanId);
 
   assert.ok(scan);
-  assert.equal(scan.status, "ready");
-  assert.equal(scan.discovered.length, 3);
-  assert.equal(harness.calls.scriptingExecuted.length, 1);
+  assert.strictEqual(scan.status, "ready");
+  assert.strictEqual(scan.discovered.length, 3);
+  assert.strictEqual(harness.calls.scriptingExecuted.length, 1);
 
-  assert.deepEqual(harness.calls.scriptingExecuted[0], {
+  assert.deepStrictEqual(harness.calls.scriptingExecuted[0], {
     target: { tabId: sourceTabId },
     files: ["dist/page-playlist-probe.js"],
     world: "MAIN",
   });
 
-  assert.equal(harness.calls.windowsCreated.length, 0);
-  assert.equal(harness.calls.tabsCreated.length, 1);
+  assert.strictEqual(harness.calls.windowsCreated.length, 0);
+  assert.strictEqual(harness.calls.tabsCreated.length, 1);
 });

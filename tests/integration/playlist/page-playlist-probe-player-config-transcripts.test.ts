@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import { createProbeSandbox } from "./__mocks__/page-playlist-probe-sandbox.ts";
 
 test("extracts transcript webvtt_file_url from player config JSON while ignoring mosaic.vtt storyboards", async () => {
@@ -50,16 +49,16 @@ test("extracts transcript webvtt_file_url from player config JSON while ignoring
     },
   ]);
 
-  assert.equal(result.unresolvedIndices.length, 0);
+  assert.strictEqual(result.unresolvedIndices.length, 0);
 
   const discovered = result.discovered.get(0);
 
-  assert.equal(
+  assert.strictEqual(
     discovered?.mediaUrl,
     "https://media.example.net/video-3727/hls/playlist.m3u8",
   );
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     [...(discovered?.subtitles || [])].map((track) => track.url),
     ["https://assets.example.net/transcript-3824457"],
   );

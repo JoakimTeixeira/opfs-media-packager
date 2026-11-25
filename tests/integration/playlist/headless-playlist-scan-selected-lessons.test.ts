@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import {
   harness,
   makeApiLessons,
@@ -48,7 +47,7 @@ test("open-course-download filters discovered lessons by selectedItemIndices in 
     extSender,
   );
 
-  assert.equal(okResult?.ok, true);
+  assert.strictEqual(okResult?.ok, true);
   const createdUrl = harness.calls.tabsCreated[0].url;
   const playlistDownloadId = new URL(createdUrl).searchParams.get("playlist");
 
@@ -57,7 +56,7 @@ test("open-course-download filters discovered lessons by selectedItemIndices in 
     extSender,
   );
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     taken?.playlistDownload?.items.map((item) => item.itemIndex),
     [0, 2],
   );
@@ -73,19 +72,19 @@ test("open-course-download filters discovered lessons by selectedItemIndices in 
     extSender,
   );
 
-  assert.equal(completed?.ok, true);
+  assert.strictEqual(completed?.ok, true);
 
   const takenAfterReload = await harness.sendRuntimeMessage(
     { type: "take-playlist-download", playlistDownloadId },
     extSender,
   );
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     takenAfterReload?.playlistDownload?.completedItemIndices,
     [0],
   );
 
-  assert.deepEqual(
+  assert.deepStrictEqual(
     takenAfterReload?.playlistDownload?.items.map((item) => item.itemIndex),
     [0, 2],
   );
@@ -100,11 +99,11 @@ test("open-course-download filters discovered lessons by selectedItemIndices in 
     extSender,
   );
 
-  assert.equal(authorized?.ok, true);
+  assert.strictEqual(authorized?.ok, true);
   assert.ok(harness.calls.dnrAdded.length >= 1);
 
   const latestRule = harness.calls.dnrAdded.at(-1) as
     { condition?: { urlFilter?: string } } | undefined;
 
-  assert.equal(latestRule?.condition?.urlFilter, "||media.example.net/3/*");
+  assert.strictEqual(latestRule?.condition?.urlFilter, "||media.example.net/3/*");
 });

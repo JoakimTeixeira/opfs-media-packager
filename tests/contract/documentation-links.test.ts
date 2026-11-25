@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { assert, expect, test } from "vitest";
 import { access, readFile, readdir } from "node:fs/promises";
 import { dirname, extname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -30,7 +29,7 @@ test("should resolve local documentation links to existing project paths", async
       const target = link.split("#")[0];
 
       if (target && !/^(?:https?:|mailto:)/i.test(target)) {
-        assert.equal(
+        assert.strictEqual(
           link.includes("#"),
           false,
           `${documentPath} uses a cross-file section link: ${link}`,
@@ -44,10 +43,10 @@ test("should resolve local documentation links to existing project paths", async
         decodeURIComponent(target),
       );
 
-      await assert.doesNotReject(
+      await expect(
         access(resolved),
         `${documentPath} links to a missing path: ${target}`,
-      );
+      ).resolves.toBeUndefined();
     }
   }
 });

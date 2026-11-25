@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import {
   COURSE_ORIGIN,
   type ApiLesson,
@@ -130,14 +129,14 @@ test("Tier 1.5 ignores stale collect-direct-video matching previousStreamKey aft
   const scan = await waitForScanReady(started.scanId, 12000);
 
   assert.ok(scan);
-  assert.equal(scan.status, "ready");
-  assert.equal(scan.discovered.length, 2);
+  assert.strictEqual(scan.status, "ready");
+  assert.strictEqual(scan.discovered.length, 2);
 
   const first = scan.discovered.find((item) => item.itemIndex === 0);
   const second = scan.discovered.find((item) => item.itemIndex === 1);
 
-  assert.equal(first?.url, directVideoUrl);
-  assert.equal(second?.url, "");
-  assert.equal(second?.qualityOptions?.length, 0);
-  assert.equal(second?.documents?.markdown, "# Nota da aula\n");
+  assert.strictEqual(first?.url, directVideoUrl);
+  assert.strictEqual(second?.url, "");
+  assert.strictEqual(second?.qualityOptions?.length, 0);
+  assert.strictEqual(second?.documents?.markdown, "# Nota da aula\n");
 });

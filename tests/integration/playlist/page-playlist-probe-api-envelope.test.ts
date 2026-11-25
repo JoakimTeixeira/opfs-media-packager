@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import { encodeDeflatedEnvelope } from "./__mocks__/page-playlist-probe-environment.ts";
 import { createProbeSandbox } from "./__mocks__/page-playlist-probe-sandbox.ts";
 
@@ -36,9 +35,9 @@ test("captures custom deflated-envelope API template from generic JSON fetch and
     },
   ]);
 
-  assert.equal(result.unresolvedIndices.length, 0);
+  assert.strictEqual(result.unresolvedIndices.length, 0);
 
-  assert.equal(
+  assert.strictEqual(
     result.discovered.get(0)?.mediaUrl,
     "https://media.example.net/custom-9002/playlist.m3u8",
   );

@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import {
   COURSE_ORIGIN,
   type ApiLesson,
@@ -274,10 +273,10 @@ test("Tier 1.5 probes multiple linked posts sequentially, keeps parent Markdown 
   const scan = await waitForScanReady(started.scanId, 12000);
 
   assert.ok(scan);
-  assert.equal(scan.status, "ready");
-  assert.equal(scan.nextItemIndex, 2);
-  assert.deepEqual(openedFrameUrls, [post1Url, post2Url, post3Url]);
-  assert.equal(scan.discovered.length, 2);
+  assert.strictEqual(scan.status, "ready");
+  assert.strictEqual(scan.nextItemIndex, 2);
+  assert.deepStrictEqual(openedFrameUrls, [post1Url, post2Url, post3Url]);
+  assert.strictEqual(scan.discovered.length, 2);
 
   const ytLesson = scan.discovered.find((item) => item.itemIndex === 0);
 
@@ -286,26 +285,26 @@ test("Tier 1.5 probes multiple linked posts sequentially, keeps parent Markdown 
   const multiLesson = scan.discovered.find((item) => item.itemIndex === 1);
 
   assert.ok(multiLesson);
-  assert.equal(multiLesson.title, "1.2 Workflow Patterns");
-  assert.equal(multiLesson.primaryVideoTitle, "1.2 Reading Group - Patterns");
+  assert.strictEqual(multiLesson.title, "1.2 Workflow Patterns");
+  assert.strictEqual(multiLesson.primaryVideoTitle, "1.2 Reading Group - Patterns");
 
-  assert.equal(
+  assert.strictEqual(
     multiLesson.url,
     "https://media.example.net/pattern-group-1/playlist.m3u8",
   );
 
-  assert.equal(multiLesson.extraVideos?.length, 1);
+  assert.strictEqual(multiLesson.extraVideos?.length, 1);
 
-  assert.equal(multiLesson.extraVideos?.[0]?.title, "1.2 Sample Lesson Video");
+  assert.strictEqual(multiLesson.extraVideos?.[0]?.title, "1.2 Sample Lesson Video");
 
-  assert.equal(
+  assert.strictEqual(
     multiLesson.extraVideos?.[0]?.url,
     "https://media.example.net/pattern-lesson-2/playlist.m3u8",
   );
 
-  assert.equal(multiLesson.documents?.images.length, 2);
-  assert.equal(multiLesson.documents?.diagrams.length, 1);
-  assert.equal(multiLesson.documents?.extraNotes?.length, 3);
+  assert.strictEqual(multiLesson.documents?.images.length, 2);
+  assert.strictEqual(multiLesson.documents?.diagrams.length, 1);
+  assert.strictEqual(multiLesson.documents?.extraNotes?.length, 3);
 
   assert.match(
     multiLesson.documents?.markdown || "",

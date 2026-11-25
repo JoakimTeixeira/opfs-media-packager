@@ -1,5 +1,4 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { test, assert } from "vitest";
 import { createProbeSandbox } from "./__mocks__/page-playlist-probe-sandbox.ts";
 
 test("extracts deep subtitles via BFS and resolves linked video post with its own title", async () => {
@@ -85,19 +84,19 @@ test("extracts deep subtitles via BFS and resolves linked video post with its ow
     },
   ]);
 
-  assert.equal(result.unresolvedIndices.length, 0);
+  assert.strictEqual(result.unresolvedIndices.length, 0);
 
-  assert.equal(
+  assert.strictEqual(
     result.discovered.get(0)?.subtitles?.[0]?.url,
     "https://media.example.net/101/pt.vtt",
   );
 
-  assert.equal(
+  assert.strictEqual(
     result.discovered.get(1)?.mediaUrl,
     "https://media.example.net/workshop/playlist.m3u8",
   );
 
-  assert.equal(
+  assert.strictEqual(
     result.discovered.get(1)?.linkedTitle,
     "Architecture Live Session",
   );
