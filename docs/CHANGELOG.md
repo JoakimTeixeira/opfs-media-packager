@@ -1,0 +1,65 @@
+# Changelog
+
+All notable changes to OPFS Media Packager from early prototypes (`v0.1.x`) through `v2.49`, newest first. Original build folders prior to `v1.5` were not archived; those early entries summarize the initial prototype progression.
+
+- **v2.49**: Extended architecture checks, added Mermaid diagram fence tests, verified MP4/MKV tracks and repeated access-failure pauses in Chromium, aligned ubiquitous terminology, and installed `harness-score` with the baseline Level 0 scan.
+- **v2.48**: Extracted the playlist queue failure policy into a reusable module, added `check:architecture` boundary tests, and documented the staged regression protection plan.
+- **v2.47**: Clarified setup, architecture boundaries, scan retries, test scope, and security evidence; added local documentation link checks, contributor troubleshooting, and resolved npm dev dependency advisories.
+- **v2.46**: Added existing-download indexing to skip files Chrome Downloads confirms as present, preserved preferences on playlist resume, and added OPFS segment checkpoints and bounded retries with `Retry-After`.
+- **v2.45**: Added hidden subtitle discovery, double-encoded UTF-8 subtitle/document repair, companion document export (Markdown, SVG, generated PDF), and single-hop linked-page discovery.
+- **v2.44**: Added OPFS-backed FFmpeg remuxing for large MP4/MKV files, kept active download tabs eligible under Chrome Memory Saver, and surfaced actionable packaging failures.
+- **v2.43**: Modeled playlist item outcomes (`completed`, `cancelled`, `failed`) and classified failures (`item`, `unauthorized`, `rate-limited`, `engine`) for queue pause rules.
+- **v2.42**: Migrated the entire codebase (entry points, reusable modules, build scripts, and unit/integration/E2E tests) from JavaScript with JSDoc to strict TypeScript, and added `lint:fix`.
+- **v2.41**: Serialized playlist scan requests with pacing, `Retry-After` backoff, and a repeated-429 circuit breaker; extracted linked-video discovery and added `jscpd` duplication and `knip` dead-code quality gates.
+- **v2.40**: Added hidden same-site frames for headless playlist scanning without disturbing visible tabs.
+- **v2.39**: Validated playlist API responses and fixed multi-chapter route discovery.
+- **v2.38**: Added playlist item selection, spoken subtitle language detection, and improved subtitle discovery.
+- **v2.37**: Added single-hop discovery for linked videos attached to playlist items.
+- **v2.36**: Added faster background scanning for multi-item playlist pages.
+- **v2.35**: Added support for button-driven playlist sidebars and section-aware item titles.
+- **v2.34**: Improved item counts and section grouping for sidebar playlists.
+- **v2.33**: Restored bundled `dist/` extension outputs and build verification checks.
+- **v2.32**: Standardized user-facing copy around video stream, quality option, and output format.
+- **v2.31**: Added sidebar-based playlist scanning and bounded validation for untrusted page-provided values.
+- **v2.30**: Persisted scan state across popup refreshes and standardized download preference defaults.
+- **v2.29**: Added automatic outline detection for multi-item playlist pages.
+- **v2.28**: Added page-structure adapters so detection stays independent of website branding.
+- **v2.27**: Trimmed core modules and simplified internal stream and download helpers.
+- **v2.26**: Hardened popup and downloader responsiveness under dense stream lists.
+- **v2.25**: Improved multi-item page detection and playlist handoff from the popup.
+- **v2.24**: Added stream collection deduplication and merging across nested embedded video players.
+- **v2.23**: Improved guided download status messages and actionable error states.
+- **v2.22**: Moved to a self-contained browser-only extension design without external native helpers.
+- **v2.21**: Switched file saving to Chrome Downloads without per-file save dialogs.
+- **v2.19**: Added page-context media transport for hosts requiring signed-in page requests.
+- **v2.18**: Fixed active-tab session matching when switching between signed-in tabs.
+- **v2.17**: Fixed session header handling for authenticated media requests.
+- **v2.16**: Added Playwright Chromium end-to-end tests (`test:e2e`) and centralized download control state rules.
+- **v2.15**: Added scoped `declarativeNetRequest` authorization rules for protected HLS streams.
+- **v2.14**: Added esbuild bundling (`build`), Lucide icons, shared download preferences, and HLS quality ladder ranking.
+- **v2.13**: Added support for direct rendition HLS manifests alongside master manifests.
+- **v2.12**: Added multi-rendition HLS manifest discovery across nested quality paths.
+- **v2.11**: Added safe relative download subfolder normalization and aligned domain terminology.
+- **v2.10**: Extracted referrer-aware media request building and refactored core helper modules.
+- **v2.9**: Added stable logical stream identity keys across rotating signed media URLs.
+- **v2.8**: Extracted download target handling and improved playback detection and popup UX.
+- **v2.7**: Improved playlist review and download setup workflows.
+- **v2.6**: Reached zero surviving mutants on protected domain modules with Stryker.
+- **v2.5**: Added privileged message sender validation and `c8` test coverage thresholds (`coverage:check`).
+- **v2.4**: Added URL safety checks, HLS manifest parsing, player adapters, playlist planning, ESLint, Prettier, HTMLHint, Stryker mutation testing, and `npm run verify`.
+- **v2.3**: Added multi-item playlist scanning and sequential playlist downloads.
+- **v2.2**: Added automatic quality option detection from HLS manifests.
+- **v2.1**: Added one-click handoff from the popup to start downloads immediately.
+- **v2.0**: Added configurable Chrome Downloads target folders.
+- **v1.9**: Added automatic WebVTT subtitle detection from media requests and players.
+- **v1.8**: Added WebVTT subtitle language inference, test coverage reporting, and single-file MKV packaging with an embedded default subtitle track.
+- **v1.7**: Added selectable MP4 (sidecar subtitle) and MKV (embedded subtitle) output formats.
+- **v1.6**: Added automatic matching subtitle download alongside MP4 video output.
+- **v1.5 (v0.1.5)**: Switched from `mux.js` to bundled FFmpeg WebAssembly for local MP4 remuxing of unencrypted HLS video segments and revised matching subtitle naming.
+- **v0.1.4**: Intermediate pre-FFmpeg build (no archived release notes or build artifact).
+- **v0.1.3**: Adjusted MP4 fragment sequence numbering and attempted background subtitle saving using the video title.
+- **v0.1.2**: Patched post-remux MP4 duration metadata to correct inflated duration readings and revised the subtitle save flow.
+- **v0.1.1**: Added a Downloads-oriented file picker, the Chrome `downloads` permission, typed JSDoc annotations, initial automated tests, and automatic matching subtitle saving.
+- **Initial prototypes**: Added manual HLS manifest downloads, active-tab request detection, initial `mux.js` MP4 packaging, quality option selection, subtitle discovery, title-based filenames, and configurable parallel segment fetching.
+
+Related docs: [README](../README.md), [Architecture](architecture.md), [Decisions](decisions.md), and [Testing and quality](testing-and-quality.md).

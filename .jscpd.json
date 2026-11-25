@@ -1,0 +1,17 @@
+{
+  "threshold": 0,
+  "minLines": 8,
+  "minTokens": 50,
+  "reporters": ["console"],
+  "ignore": [
+    "**/coverage/**",
+    "**/dist/**",
+    "**/node_modules/**",
+    "**/vendor/**",
+    "**/tests/**",
+    "**/reports/**",
+    "**/test-results/**",
+    "**/.stryker-tmp/**"
+  ],
+  "format": ["typescript", "javascript"]
+}
