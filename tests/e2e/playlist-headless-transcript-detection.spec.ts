@@ -1,5 +1,5 @@
-import { test, expect } from "./fixtures.ts";
-import { contentScript } from "./playlist-headless-fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
+import { contentScript } from "./fixtures/playlist-headless-fixtures.ts";
 
 test("should recover eager page transcript VTTs while ignoring blob tracks and mosaic.vtt, and extract main h2 lesson heading", async ({
   sharedBrowser,

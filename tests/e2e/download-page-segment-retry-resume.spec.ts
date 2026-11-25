@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { test, expect } from "./fixtures.ts";
-import { generateTinyTsSegment } from "./download-page-fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
+import { generateTinyTsSegment } from "./fixtures/download-page-fixtures.ts";
 
 test("should recover from transient HTTP 503 throttling and resume sealed OPFS segments without re-fetching completed chunks", async ({
   extensionFixture,

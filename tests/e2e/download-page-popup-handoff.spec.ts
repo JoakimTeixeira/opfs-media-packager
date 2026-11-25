@@ -1,5 +1,5 @@
 import { type Page } from "@playwright/test";
-import { test, expect } from "./fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
 
 test("should start a popup handoff automatically before surfacing a playlist failure", async ({
   extensionFixture,

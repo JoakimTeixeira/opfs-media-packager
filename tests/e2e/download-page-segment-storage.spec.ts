@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { test, expect } from "./fixtures.ts";
-import { generateTinyTsSegment } from "./download-page-fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
+import { generateTinyTsSegment } from "./fixtures/download-page-fixtures.ts";
 
 test("should stream segments through OPFS with discontinuity splitting, sweep stale temp dirs, and fall back to MEMFS when OPFS is unavailable", async ({
   extensionFixture,

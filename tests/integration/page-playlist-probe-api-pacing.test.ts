@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { encodeDeflatedEnvelope } from "./page-playlist-probe-fixtures.ts";
-import { createProbeSandbox } from "./page-playlist-probe-sandbox.ts";
+import { encodeDeflatedEnvelope } from "./fixtures/page-playlist-probe-fixtures.ts";
+import { createProbeSandbox } from "./fixtures/page-playlist-probe-sandbox.ts";
 
 test("serializes and paces API-route requests (max 1 in-flight) and honors Retry-After on a single 429", async () => {
   const attempts = new Map<string, number>();

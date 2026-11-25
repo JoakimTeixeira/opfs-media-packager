@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fromVmRealm } from "./page-playlist-probe-fixtures.ts";
-import { createProbeSandbox } from "./page-playlist-probe-sandbox.ts";
+import { fromVmRealm } from "./fixtures/page-playlist-probe-fixtures.ts";
+import { createProbeSandbox } from "./fixtures/page-playlist-probe-sandbox.ts";
 
 test("keeps probing 1-hop supplementary event links on lessons that already have a primary HLS video and detects direct MP4 event streams", async () => {
   const live1Url = "https://training.example/c/community-events/session-alpha";

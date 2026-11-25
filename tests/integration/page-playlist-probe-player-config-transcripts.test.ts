@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createProbeSandbox } from "./page-playlist-probe-sandbox.ts";
+import { createProbeSandbox } from "./fixtures/page-playlist-probe-sandbox.ts";
 
 test("extracts transcript webvtt_file_url from player config JSON while ignoring mosaic.vtt storyboards", async () => {
   const sandbox = createProbeSandbox({

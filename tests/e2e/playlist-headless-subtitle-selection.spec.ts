@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
 
 test("should display subtitle language (never generic Subtitle) and filter selected lessons on playlist.html", async ({
   extensionFixture,

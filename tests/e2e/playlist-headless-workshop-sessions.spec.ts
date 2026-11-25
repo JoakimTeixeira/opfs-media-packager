@@ -1,9 +1,9 @@
-import { test, expect } from "./fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
 import {
   contentScript,
   type RecordedCourseMessage,
   type MockChromeWindow,
-} from "./playlist-headless-fixtures.ts";
+} from "./fixtures/playlist-headless-fixtures.ts";
 
 test("should extract all 10 workshop session items with Sessão badges, 5 sessões section headers, and custom thumbnail badges instead of falling back to 2 serialized URLs", async ({
   sharedBrowser,

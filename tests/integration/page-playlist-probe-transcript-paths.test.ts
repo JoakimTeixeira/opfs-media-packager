@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fromVmRealm } from "./page-playlist-probe-fixtures.ts";
-import { createProbeSandbox } from "./page-playlist-probe-sandbox.ts";
+import { fromVmRealm } from "./fixtures/page-playlist-probe-fixtures.ts";
+import { createProbeSandbox } from "./fixtures/page-playlist-probe-sandbox.ts";
 
 test("emits /media_transcripts/<id>.vtt from media_transcript_id with or without webvtt_file_url", async () => {
   const sandbox = createProbeSandbox({

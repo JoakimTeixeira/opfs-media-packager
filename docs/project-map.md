@@ -9,6 +9,6 @@
 | `app.ts` and `index.html`                 | Download segments, resume work, package media, and show progress.                      |
 | `lib/`                                    | Typed, reusable rules for detection, preferences, names, security, and playlist plans. |
 | `vendor/ffmpeg/`                          | Bundled FFmpeg code used to package downloaded media.                                  |
-| `tests/`                                  | Unit, integration, browser, contract, coverage, and mutation tests.                    |
+| `tests/`                                  | Unit, integration, browser, contract, and architecture tests, grouped by layer.        |
 
 Related docs: [README](../README.md), [Decisions](decisions.md), [Testing and quality](testing-and-quality.md), and [Security](../SECURITY.md).

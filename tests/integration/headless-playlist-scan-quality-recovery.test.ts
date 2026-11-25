@@ -6,8 +6,8 @@ import {
   EXT_ID,
   type MessageSender,
   type DiscoveredQualityOption,
-} from "./headless-playlist-scan-types.ts";
-import { harness, extSender } from "./headless-playlist-scan-setup.ts";
+} from "./fixtures/headless-playlist-scan-types.ts";
+import { harness, extSender } from "./fixtures/headless-playlist-scan-setup.ts";
 
 test("list-detections recovers empty quality options via course page fallback and course-outline never downgrades 21 lessons to 2", async () => {
   harness.reset();

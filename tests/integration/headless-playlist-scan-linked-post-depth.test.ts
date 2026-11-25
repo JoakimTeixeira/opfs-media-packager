@@ -1,11 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { stringField, EXT_ID } from "./headless-playlist-scan-types.ts";
+import {
+  stringField,
+  EXT_ID,
+} from "./fixtures/headless-playlist-scan-types.ts";
 import {
   harness,
   extSender,
   waitForScanReady,
-} from "./headless-playlist-scan-setup.ts";
+} from "./fixtures/headless-playlist-scan-setup.ts";
 
 test("Tier 1.5 stops at 1-hop for linked non-video child posts, skips self/duplicate URLs, and preserves parent lesson title", async () => {
   harness.reset();

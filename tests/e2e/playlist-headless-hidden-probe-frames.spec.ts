@@ -1,10 +1,10 @@
-import { test, expect } from "./fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
 import {
   type RecordedCourseMessage,
   type MockChromeWindow,
   contentScript,
   type RuntimeMessageHandler,
-} from "./playlist-headless-fixtures.ts";
+} from "./fixtures/playlist-headless-fixtures.ts";
 
 test("should manage invisible offscreen probe iframes cleanly and suppress outline/location messages inside them", async ({
   sharedBrowser,

@@ -5,13 +5,13 @@ import {
   EXT_ID,
   stringField,
   probeLessons,
-} from "./headless-playlist-scan-types.ts";
+} from "./fixtures/headless-playlist-scan-types.ts";
 import {
   harness,
   makeApiLessons,
   extSender,
   waitForScanReady,
-} from "./headless-playlist-scan-setup.ts";
+} from "./fixtures/headless-playlist-scan-setup.ts";
 
 test("Tier 1.5 invisible same-origin iframe captures nested player iframe via parentFrameId without polluting main tab, then escalates remaining 34 lessons", async () => {
   harness.reset();

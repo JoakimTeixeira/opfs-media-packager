@@ -4,13 +4,13 @@ import {
   type MessageSender,
   EXT_ID,
   stringField,
-} from "./headless-playlist-scan-types.ts";
+} from "./fixtures/headless-playlist-scan-types.ts";
 import {
   harness,
   makeApiLessons,
   extSender,
   waitForScanReady,
-} from "./headless-playlist-scan-setup.ts";
+} from "./fixtures/headless-playlist-scan-setup.ts";
 
 test("Stops immediately on rateLimited:true without escalating to Tier 1.5 hidden iframes or Tier 2 popup windows", async () => {
   harness.reset();

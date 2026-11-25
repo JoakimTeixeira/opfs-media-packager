@@ -1,5 +1,5 @@
-import { test, expect } from "./fixtures.ts";
-import { contentScript } from "./playlist-headless-fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
+import { contentScript } from "./fixtures/playlist-headless-fixtures.ts";
 
 test("should expand collapsed sidebar sections and reset subtitle resource floor on navigate-course-sidebar", async ({
   sharedBrowser,

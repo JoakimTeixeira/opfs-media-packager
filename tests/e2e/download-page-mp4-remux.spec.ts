@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { test, expect } from "./fixtures.ts";
-import { generateTinyTsSegment } from "./download-page-fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
+import { generateTinyTsSegment } from "./fixtures/download-page-fixtures.ts";
 
 test("should drive app.ts Download and FFmpeg remux to save both MP4 and VTT with the clean video name rather than a blob UUID", async ({
   extensionFixture,

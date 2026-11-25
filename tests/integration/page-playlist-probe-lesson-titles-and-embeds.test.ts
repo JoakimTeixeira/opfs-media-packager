@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fromVmRealm } from "./page-playlist-probe-fixtures.ts";
-import { createProbeSandbox } from "./page-playlist-probe-sandbox.ts";
+import { fromVmRealm } from "./fixtures/page-playlist-probe-fixtures.ts";
+import { createProbeSandbox } from "./fixtures/page-playlist-probe-sandbox.ts";
 
 test("resolves punctuation-sanitized titles, section-scoped duplicate titles, embed SGIDs, tiptap_body posts, and VideoPlayer HTML pages", async () => {
   const courseUrl =

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createProbeSandbox } from "./page-playlist-probe-sandbox.ts";
+import { createProbeSandbox } from "./fixtures/page-playlist-probe-sandbox.ts";
 
 test("propagates rateLimited explicitly through linked-video HTML resolution without hammering subsequent lessons", async () => {
   const requestedUrls: string[] = [];

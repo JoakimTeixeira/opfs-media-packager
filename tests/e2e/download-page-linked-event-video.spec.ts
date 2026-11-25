@@ -1,11 +1,11 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { test, expect } from "./fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
 import {
   generateTinyTsSegment,
   DIRECT_MP4_E2E_BYTES,
-} from "./download-page-fixtures.ts";
-import { startMaterialsE2eServer } from "./download-page-materials-server.ts";
+} from "./fixtures/download-page-fixtures.ts";
+import { startMaterialsE2eServer } from "./fixtures/download-page-materials-server.ts";
 
 test("should download a lesson with a primary HLS video, subtitle, and linked direct MP4 event video without FFmpeg remux", async ({
   extensionFixture,

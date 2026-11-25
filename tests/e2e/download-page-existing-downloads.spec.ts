@@ -1,8 +1,8 @@
 import { readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
-import { test, expect } from "./fixtures.ts";
-import { generateTinyTsSegment } from "./download-page-fixtures.ts";
-import { startMaterialsE2eServer } from "./download-page-materials-server.ts";
+import { test, expect } from "./fixtures/extension.ts";
+import { generateTinyTsSegment } from "./fixtures/download-page-fixtures.ts";
+import { startMaterialsE2eServer } from "./fixtures/download-page-materials-server.ts";
 
 test("should skip already-downloaded videos, subtitles, and materials on playlist re-download while restoring deleted files", async ({
   extensionFixture,

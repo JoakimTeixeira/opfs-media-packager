@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
 
 test("should keep a dense course popup clear, deduplicated, and operable", async ({
   extensionFixture,

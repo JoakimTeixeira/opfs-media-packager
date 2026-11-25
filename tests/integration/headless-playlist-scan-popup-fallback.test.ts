@@ -4,12 +4,12 @@ import {
   stringField,
   probeLessons,
   EXT_ID,
-} from "./headless-playlist-scan-types.ts";
+} from "./fixtures/headless-playlist-scan-types.ts";
 import {
   harness,
   extSender,
   makeApiLessons,
-} from "./headless-playlist-scan-setup.ts";
+} from "./fixtures/headless-playlist-scan-setup.ts";
 
 test("Tier 2 fallback opens minimized popup WITHOUT focused property and NEVER falls back to main-window chrome.tabs.create", async () => {
   harness.reset();

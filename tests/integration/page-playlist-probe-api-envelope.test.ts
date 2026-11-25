@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { encodeDeflatedEnvelope } from "./page-playlist-probe-fixtures.ts";
-import { createProbeSandbox } from "./page-playlist-probe-sandbox.ts";
+import { encodeDeflatedEnvelope } from "./fixtures/page-playlist-probe-fixtures.ts";
+import { createProbeSandbox } from "./fixtures/page-playlist-probe-sandbox.ts";
 
 test("captures custom deflated-envelope API template from generic JSON fetch and reuses it across lessons", async () => {
   const requestedUrls: string[] = [];

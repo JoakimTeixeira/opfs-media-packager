@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
 
 test("should stop a course after two denied lessons without requesting the third", async ({
   extensionFixture,

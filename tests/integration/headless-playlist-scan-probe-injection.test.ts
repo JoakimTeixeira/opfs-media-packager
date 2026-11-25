@@ -5,13 +5,13 @@ import {
   EXT_ID,
   stringField,
   probeLessons,
-} from "./headless-playlist-scan-types.ts";
+} from "./fixtures/headless-playlist-scan-types.ts";
 import {
   harness,
   makeApiLessons,
   extSender,
   waitForScanReady,
-} from "./headless-playlist-scan-setup.ts";
+} from "./fixtures/headless-playlist-scan-setup.ts";
 
 test("Injects page-course-probe.js via chrome.scripting when Tier 1 reports probe-not-ready", async () => {
   harness.reset();

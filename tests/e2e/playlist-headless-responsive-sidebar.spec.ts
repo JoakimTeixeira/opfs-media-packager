@@ -1,5 +1,5 @@
-import { test, expect } from "./fixtures.ts";
-import { contentScript } from "./playlist-headless-fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
+import { contentScript } from "./fixtures/playlist-headless-fixtures.ts";
 
 test("should extract all 21 lessons across large, medium, and small responsive breakpoints even when aside unmounts below 1024px and 2 stray links exist", async ({
   sharedBrowser,

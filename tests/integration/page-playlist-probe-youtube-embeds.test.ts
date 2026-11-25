@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { fromVmRealm } from "./page-playlist-probe-fixtures.ts";
-import { createProbeSandbox } from "./page-playlist-probe-sandbox.ts";
+import { fromVmRealm } from "./fixtures/page-playlist-probe-fixtures.ts";
+import { createProbeSandbox } from "./fixtures/page-playlist-probe-sandbox.ts";
 
 test("resolves YouTube embed lessons in Tier 1, preserves partial materials across multi-post entity lessons, extracts disabled transcripts with webvtt_file_url, and reports community media_settings transcripts", async () => {
   const youtubeLessonPayload = {

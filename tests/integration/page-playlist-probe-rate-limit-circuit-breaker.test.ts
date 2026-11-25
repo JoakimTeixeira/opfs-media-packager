@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { encodeDeflatedEnvelope } from "./page-playlist-probe-fixtures.ts";
-import { createProbeSandbox } from "./page-playlist-probe-sandbox.ts";
+import { encodeDeflatedEnvelope } from "./fixtures/page-playlist-probe-fixtures.ts";
+import { createProbeSandbox } from "./fixtures/page-playlist-probe-sandbox.ts";
 
 test("trips the 429 circuit breaker on persistent throttling, stops remaining fetches, and skips SPA HTML fallback", async () => {
   const requestedUrls: string[] = [];

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createProbeSandbox } from "./page-playlist-probe-sandbox.ts";
+import { createProbeSandbox } from "./fixtures/page-playlist-probe-sandbox.ts";
 
 test("extracts deep subtitles via BFS and resolves linked video post with its own title", async () => {
   const sandbox = createProbeSandbox({

@@ -6,12 +6,12 @@ import {
   stringField,
   probeLessons,
   EXT_ID,
-} from "./headless-playlist-scan-types.ts";
+} from "./fixtures/headless-playlist-scan-types.ts";
 import {
   harness,
   extSender,
   waitForScanReady,
-} from "./headless-playlist-scan-setup.ts";
+} from "./fixtures/headless-playlist-scan-setup.ts";
 
 test("Tier 1.5 steps invisibly through sidebar lessons, skips seeded stream on firstRun, probes linked video in temp sibling iframe, and keeps sidebar intact", async () => {
   harness.reset();

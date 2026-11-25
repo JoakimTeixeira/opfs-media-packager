@@ -7,12 +7,12 @@ import {
   type ApiLesson,
   type RuntimeResponse,
   probeLessons,
-} from "./headless-playlist-scan-types.ts";
+} from "./fixtures/headless-playlist-scan-types.ts";
 import {
   harness,
   extSender,
   waitForScanReady,
-} from "./headless-playlist-scan-setup.ts";
+} from "./fixtures/headless-playlist-scan-setup.ts";
 
 test("Tier 1.5 discovers linked video via find-linked-video-in-page when Tier 1 provides no pre-known link and rejects forged hidden-probe-frame-ready senders", async () => {
   harness.reset();

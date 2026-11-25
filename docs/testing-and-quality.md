@@ -16,6 +16,8 @@ New or changed test names should start with `should` and describe one observable
 
 The test pyramid keeps most tests fast at the unit layer. Integration and browser tests cover the connections that unit tests cannot observe. Mutation testing checks whether the tests would catch common implementation mistakes.
 
+The `tests/unit/`, `tests/integration/`, and `tests/e2e/` directories contain those three layers. `tests/contract/` checks packaging, security, and documentation agreements, while `tests/architecture/` checks dependency boundaries. Shared integration and browser fixtures live in each layer's `fixtures/` directory. Coverage and mutation runs use these existing tests rather than a separate test layer.
+
 ## Test techniques and intent
 
 | Technique                 | How it is used                                                                                                      | Value for maintenance and audit                                           |
@@ -38,7 +40,7 @@ The test pyramid keeps most tests fast at the unit layer. Integration and browse
 | `npm run format:check`       | Verify consistent formatting with Prettier.                                                                               |
 | `npm run lint`               | Run ESLint and HTMLHint. Any warning fails the command.                                                                   |
 | `npm run typecheck`          | Run strict TypeScript checks.                                                                                             |
-| `npm test`                   | Run Node.js unit and integration tests.                                                                                   |
+| `npm test`                   | Run Node.js unit, integration, contract, and architecture tests.                                                          |
 | `npm run coverage:check`     | Require 100% line coverage, at least 96% branch coverage, and at least 97% function coverage for `lib/`.                  |
 | `npm run test:e2e`           | Run the real Chromium extension workflow. Run `npm run setup:e2e` once when Playwright's browser is missing.              |
 | `npm run test:mutation`      | Run Stryker against the modules listed in `stryker.config.mjs`. The configured score threshold is 100%.                   |
@@ -49,6 +51,8 @@ The test pyramid keeps most tests fast at the unit layer. Integration and browse
 ## Test design rules
 
 - Keep test files at or below 400 physical lines, including blank lines and comments. ESLint enforces the limit for test and spec files.
+- Group unit tests by the module they exercise and name scenario files after the behaviour they cover.
+- Extract shared mocks and large fixtures into the relevant layer's `fixtures/` directory. Keep test cases independent so the runner can execute test files in parallel.
 - Start with a focused test around the rule that needs to change. This creates a safe seam in existing code before refactoring.
 - Assert visible behaviour and meaningful state. Avoid asserting private implementation details unless they enforce a security or browser contract.
 - Use local fake servers for network cases. They make authorization, rate-limit, retry, and timeout behaviour repeatable.

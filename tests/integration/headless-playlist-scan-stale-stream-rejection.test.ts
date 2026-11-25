@@ -6,12 +6,12 @@ import {
   stringField,
   probeLessons,
   EXT_ID,
-} from "./headless-playlist-scan-types.ts";
+} from "./fixtures/headless-playlist-scan-types.ts";
 import {
   harness,
   extSender,
   waitForScanReady,
-} from "./headless-playlist-scan-setup.ts";
+} from "./fixtures/headless-playlist-scan-setup.ts";
 
 test("Tier 1.5 ignores stale collect-direct-video matching previousStreamKey after sidebar navigation", async () => {
   harness.reset();

@@ -4,7 +4,7 @@ import {
   harness,
   makeApiLessons,
   extSender,
-} from "./headless-playlist-scan-setup.ts";
+} from "./fixtures/headless-playlist-scan-setup.ts";
 
 test("open-course-download filters discovered lessons by selectedItemIndices in course order and rejects empty selection", async () => {
   harness.reset();

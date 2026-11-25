@@ -1,9 +1,9 @@
-import { test, expect } from "./fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
 import {
   type RecordedCourseMessage,
   type MockChromeWindow,
   contentScript,
-} from "./playlist-headless-fixtures.ts";
+} from "./fixtures/playlist-headless-fixtures.ts";
 
 test("should extract all 35 multi-chapter API-route lessons updating both pathname chapter and query params", async ({
   sharedBrowser,

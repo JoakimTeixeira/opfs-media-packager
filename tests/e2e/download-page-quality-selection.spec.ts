@@ -1,5 +1,5 @@
-import { test, expect } from "./fixtures.ts";
-import { downloadRequest } from "./download-page-fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
+import { downloadRequest } from "./fixtures/download-page-fixtures.ts";
 
 test("should keep every supplied quality selectable before and after a refresh", async ({
   extensionFixture,

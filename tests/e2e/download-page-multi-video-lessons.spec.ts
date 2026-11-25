@@ -1,8 +1,8 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { test, expect } from "./fixtures.ts";
-import { generateTinyTsSegment } from "./download-page-fixtures.ts";
-import { startMaterialsE2eServer } from "./download-page-materials-server.ts";
+import { test, expect } from "./fixtures/extension.ts";
+import { generateTinyTsSegment } from "./fixtures/download-page-fixtures.ts";
+import { startMaterialsE2eServer } from "./fixtures/download-page-materials-server.ts";
 
 test("should download multi-video and multi-note lessons alongside YouTube-only Markdown lessons from the course playlist", async ({
   extensionFixture,

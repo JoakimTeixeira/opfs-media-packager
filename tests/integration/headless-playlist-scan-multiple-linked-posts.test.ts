@@ -5,12 +5,12 @@ import {
   type ApiLesson,
   stringField,
   EXT_ID,
-} from "./headless-playlist-scan-types.ts";
+} from "./fixtures/headless-playlist-scan-types.ts";
 import {
   harness,
   extSender,
   waitForScanReady,
-} from "./headless-playlist-scan-setup.ts";
+} from "./fixtures/headless-playlist-scan-setup.ts";
 
 test("Tier 1.5 probes multiple linked posts sequentially, keeps parent Markdown & images intact, and appends distinct extraVideos and extraNotes", async () => {
   harness.reset();

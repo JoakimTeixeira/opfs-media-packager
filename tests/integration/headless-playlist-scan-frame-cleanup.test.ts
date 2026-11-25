@@ -6,12 +6,12 @@ import {
   stringField,
   EXT_ID,
   probeLessons,
-} from "./headless-playlist-scan-types.ts";
+} from "./fixtures/headless-playlist-scan-types.ts";
 import {
   harness,
   extSender,
   waitForScanReady,
-} from "./headless-playlist-scan-setup.ts";
+} from "./fixtures/headless-playlist-scan-setup.ts";
 
 test("Tier 1.5 closes a linked-post firstRun frame, opens a clean course frame for sidebar lessons, and aborts cleanly when navigate-course-sidebar fails", async () => {
   harness.reset();

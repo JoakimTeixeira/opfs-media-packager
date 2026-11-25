@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { harness, extSender } from "./headless-playlist-scan-setup.ts";
+import { harness, extSender } from "./fixtures/headless-playlist-scan-setup.ts";
 
 test("list-detections recovers eager page transcript VTTs, ignores storyboard mosaic.vtt, and avoids race overwrites with recordPlaylist", async () => {
   harness.reset();

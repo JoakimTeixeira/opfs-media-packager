@@ -1,4 +1,4 @@
-import { test, expect } from "./fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
 
 test("should load the FFmpeg worker from the vendor path used by the bundled page", async ({
   extensionFixture,

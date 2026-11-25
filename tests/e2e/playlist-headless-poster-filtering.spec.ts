@@ -1,5 +1,5 @@
-import { test, expect } from "./fixtures.ts";
-import { contentScript } from "./playlist-headless-fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
+import { contentScript } from "./fixtures/playlist-headless-fixtures.ts";
 
 test("should filter embed preview and player poster images and disambiguate duplicate or punctuated sidebar titles", async ({
   sharedBrowser,

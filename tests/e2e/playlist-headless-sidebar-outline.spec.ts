@@ -1,9 +1,9 @@
-import { test, expect } from "./fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
 import {
   type RecordedCourseMessage,
   type MockChromeWindow,
   contentScript,
-} from "./playlist-headless-fixtures.ts";
+} from "./fixtures/playlist-headless-fixtures.ts";
 
 test("should extract all 21 sidebar-button lessons with true section folders and ignore hidden blocked-lesson text", async ({
   sharedBrowser,

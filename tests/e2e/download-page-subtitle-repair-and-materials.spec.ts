@@ -1,12 +1,12 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { test, expect } from "./fixtures.ts";
+import { test, expect } from "./fixtures/extension.ts";
 import {
   generateTinyTsSegment,
   runMaterialsOnlyCourseFromCoursePage,
   TINY_PNG_BYTES,
-} from "./download-page-fixtures.ts";
-import { startMaterialsE2eServer } from "./download-page-materials-server.ts";
+} from "./fixtures/download-page-fixtures.ts";
+import { startMaterialsE2eServer } from "./fixtures/download-page-materials-server.ts";
 
 test("should repair double-encoded Portuguese VTT subtitles (preserving CRLF) and support Materials-only course downloads with sanitized annotated Markdown, deduplicated URLs, headless Excalidraw 1x SVG, and 3-slide PDF", async ({
   extensionFixture,
