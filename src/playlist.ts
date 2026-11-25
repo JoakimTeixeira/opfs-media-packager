@@ -1,4 +1,20 @@
 import {
+  hasItemVideo,
+  isItemSelectable,
+  selectableItemsForScan,
+  pluralize,
+  downloadButtonLabel,
+  selectionUnitLabel,
+  emptySelectionLabel,
+  itemMetaText,
+  scanStatusCopy,
+  selectedIndicesForScan,
+  setItemSelected,
+  playlistRenderSignature,
+  type DiscoveredItem,
+  type PlaylistScan,
+} from "./playlist-view.ts";
+import {
   PLAYLIST_DOWNLOAD_MODE_OPTIONS,
   DEFAULT_PLAYLIST_DOWNLOAD_MODE,
   DEFAULT_DOWNLOAD_PREFERENCES,
@@ -11,40 +27,10 @@ import {
   subtitleDownloadPreferenceOrDefault,
   type PlaylistDownloadMode,
 } from "../lib/downloads/download-preferences.ts";
-import type { VideoQualityOption } from "../lib/media/hls-master.ts";
-import {
-  isItemDownloadableForMode,
-  summarizeItemCompanionDocuments,
-  type ItemCompanionDocuments,
-} from "../lib/materials/item-assets.ts";
 import {
   DEFAULT_SEGMENT_CONCURRENCY,
   clampConcurrency,
 } from "../lib/downloads/segments.ts";
-import type { KnownSubtitleTrack } from "../lib/subtitles/subtitle-tracks.ts";
-
-interface DiscoveredItem {
-  readonly itemIndex: number;
-  readonly title: string;
-  readonly url?: string;
-  readonly folderPath: readonly string[];
-  readonly qualityOptions: readonly VideoQualityOption[];
-  readonly subtitles?: readonly KnownSubtitleTrack[];
-  readonly extraVideos?: readonly {
-    readonly title: string;
-    readonly url: string;
-  }[];
-  readonly documents?: ItemCompanionDocuments;
-}
-
-interface PlaylistScan {
-  readonly title: string;
-  readonly nextItemIndex: number;
-  readonly items: { readonly length: number };
-  readonly status: "scanning" | "ready";
-  readonly rateLimited?: boolean;
-  readonly discovered: readonly DiscoveredItem[];
-}
 
 function requireElement<T extends HTMLElement>(selector: string): T {
   const element = document.querySelector<T>(selector);
@@ -111,81 +97,17 @@ function applyDownloadModeUi(): void {
   segmentConcurrency.disabled = documentsOnly;
 }
 
-function hasItemVideo(item: DiscoveredItem): boolean {
-  return Boolean(item.url?.trim()) || item.qualityOptions.length > 0;
-}
-
-function isItemSelectable(
-  item: DiscoveredItem,
-  mode: PlaylistDownloadMode,
-): boolean {
-  return isItemDownloadableForMode(item, mode);
-}
-
-function selectableItemsForScan(
-  scan: PlaylistScan,
-  mode: PlaylistDownloadMode,
-): readonly DiscoveredItem[] {
-  return scan.discovered.filter((item) => isItemSelectable(item, mode));
-}
-
-function pluralize(count: number, singular: string): string {
-  return count === 1 ? singular : `${singular}s`;
-}
-
-function downloadButtonLabel(
-  selectedCount: number,
-  total: number,
-  mode: PlaylistDownloadMode,
-): string {
-  if (total === 0) {
-    return mode === "documents"
-      ? "Download documents"
-      : "Download selected items";
-  }
-
-  if (selectedCount === 0) return "Select at least one item";
-
-  const prefix = mode === "documents" ? "Download documents for " : "Download ";
-
-  if (selectedCount === total) {
-    return `${prefix}all ${total} ${pluralize(total, "item")}`;
-  }
-
-  return `${prefix}${selectedCount} selected ${pluralize(selectedCount, "item")}`;
-}
-
-function selectedIndicesForScan(
-  scan: PlaylistScan,
-  mode: PlaylistDownloadMode = activeDownloadMode(),
-): number[] {
-  return selectableItemsForScan(scan, mode)
-    .map((item) => item.itemIndex)
-    .filter((index) => !deselectedItemIndices.has(index));
-}
-
-function selectionUnitLabel(
-  mode: PlaylistDownloadMode,
-  allHaveVideo: boolean,
-): "item" | "video" {
-  if (mode === "documents") return "item";
-  if (mode === "all" && !allHaveVideo) return "item";
-
-  return "video";
-}
-
-function emptySelectionLabel(mode: PlaylistDownloadMode): string {
-  if (mode === "documents") return "No companion documents detected yet";
-  if (mode === "videos") return "No videos detected yet";
-
-  return "No downloadable items detected yet";
-}
-
 function updateSelectionControls(scan: PlaylistScan): void {
   const mode = activeDownloadMode();
   const selectable = selectableItemsForScan(scan, mode);
   const total = selectable.length;
-  const selectedCount = selectedIndicesForScan(scan, mode).length;
+
+  const selectedCount = selectedIndicesForScan(
+    scan,
+    mode,
+    deselectedItemIndices,
+  ).length;
+
   const allHaveVideo = total > 0 && selectable.every(hasItemVideo);
 
   if (selectionCount) {
@@ -207,59 +129,6 @@ function updateSelectionControls(scan: PlaylistScan): void {
 
   downloadAll.disabled = scan.status !== "ready" || selectedCount === 0;
   downloadAll.textContent = downloadButtonLabel(selectedCount, total, mode);
-}
-
-function setItemSelected(itemIndex: number, selected: boolean): void {
-  if (selected) {
-    deselectedItemIndices.delete(itemIndex);
-
-    return;
-  }
-
-  deselectedItemIndices.add(itemIndex);
-}
-
-function videoSummaryText(
-  qualityCount: number,
-  extraVideoCount: number,
-): string {
-  if (extraVideoCount > 0) return `${1 + extraVideoCount} videos`;
-
-  if (qualityCount > 0) {
-    return `${qualityCount} ${pluralize(qualityCount, "quality option")}`;
-  }
-
-  return "Video stream";
-}
-
-function itemMetaText(
-  item: DiscoveredItem,
-  mode: PlaylistDownloadMode,
-): string {
-  const qualityCount = item.qualityOptions.length;
-  const hasVideo = hasItemVideo(item);
-  const documentBadges = summarizeItemCompanionDocuments(item.documents);
-  const parts: string[] = [];
-
-  if (hasVideo) {
-    parts.push(videoSummaryText(qualityCount, item.extraVideos?.length ?? 0));
-  }
-
-  if (mode !== "documents" && item.subtitles?.[0]?.language) {
-    parts.push(item.subtitles[0].language);
-  }
-
-  if (!hasVideo && mode !== "documents") {
-    parts.push(documentBadges.length > 0 ? "Documents only" : "Subtitle only");
-  }
-
-  parts.push(...documentBadges);
-
-  if (mode === "documents" && !documentBadges.length) {
-    parts.push("No documents");
-  }
-
-  return parts.join(" · ");
 }
 
 function buildItemRow(
@@ -286,7 +155,7 @@ function buildItemRow(
   checkbox.setAttribute("aria-label", `Select ${item.title}`);
 
   checkbox.addEventListener("change", () => {
-    setItemSelected(item.itemIndex, checkbox.checked);
+    setItemSelected(deselectedItemIndices, item.itemIndex, checkbox.checked);
     listItem.classList.toggle("deselected", !checkbox.checked);
     if (pageState.latestScan) updateSelectionControls(pageState.latestScan);
   });
@@ -309,65 +178,6 @@ function buildItemRow(
   listItem.append(label, meta);
 
   return listItem;
-}
-
-function readyStatusLabels(
-  selectableCount: number,
-  mode: PlaylistDownloadMode,
-  allHaveVideo: boolean,
-): { readonly readyLabel: string; readonly summaryText: string } {
-  if (mode === "documents") {
-    return {
-      readyLabel: `${selectableCount} ${pluralize(selectableCount, "item")} with documents ready`,
-      summaryText: `${selectableCount} ${pluralize(selectableCount, "item")} with companion documents found. Uncheck any item you want to skip.`,
-    };
-  }
-
-  if (mode === "all" && !allHaveVideo) {
-    return {
-      readyLabel: `${selectableCount} ${pluralize(selectableCount, "item")} ready`,
-      summaryText: `${selectableCount} ${pluralize(selectableCount, "item")} with downloadable content found. Uncheck any item you want to skip.`,
-    };
-  }
-
-  return {
-    readyLabel: `${selectableCount} ${pluralize(selectableCount, "stream item")} ready`,
-    summaryText: `${selectableCount} ${pluralize(selectableCount, "playable item")} found. Uncheck any item you want to skip.`,
-  };
-}
-
-function scanStatusCopy(
-  scan: PlaylistScan,
-  checked: number,
-  selectableCount: number,
-  mode: PlaylistDownloadMode,
-  allHaveVideo: boolean,
-): Readonly<{ progressText: string; summaryText: string }> {
-  if (scan.status !== "ready") {
-    return Object.freeze({
-      progressText: `Checking item ${checked} of ${scan.items.length}…`,
-      summaryText:
-        "Scanning items headlessly using your signed-in browser session with polite request pacing. You can choose settings while this finishes.",
-    });
-  }
-
-  const { readyLabel, summaryText } = readyStatusLabels(
-    selectableCount,
-    mode,
-    allHaveVideo,
-  );
-
-  if (scan.rateLimited) {
-    return Object.freeze({
-      progressText: `Rate limit reached · ${readyLabel}`,
-      summaryText: `The source site temporarily rate-limited requests, so scanning paused to protect your session. Wait a few minutes before scanning again, or download the ${selectableCount} ${pluralize(selectableCount, "item")} already found.`,
-    });
-  }
-
-  return Object.freeze({
-    progressText: readyLabel,
-    summaryText,
-  });
 }
 
 function render(scan: PlaylistScan): void {
@@ -399,19 +209,7 @@ function render(scan: PlaylistScan): void {
     (left, right) => left.itemIndex - right.itemIndex,
   );
 
-  const signature = JSON.stringify([
-    mode,
-    sorted.map((item) => [
-      item.itemIndex,
-      item.title,
-      item.url || "",
-      item.folderPath,
-      item.qualityOptions.length,
-      item.extraVideos?.length ?? 0,
-      item.subtitles?.[0]?.language || "",
-      summarizeItemCompanionDocuments(item.documents),
-    ]),
-  ]);
+  const signature = playlistRenderSignature(mode, sorted);
 
   if (signature === pageState.lastRenderedSignature) return;
   pageState.lastRenderedSignature = signature;
@@ -566,6 +364,7 @@ downloadAll.addEventListener("click", async () => {
   const selectedItemIndices = selectedIndicesForScan(
     pageState.latestScan,
     mode,
+    deselectedItemIndices,
   );
 
   if (!selectedItemIndices.length) return;

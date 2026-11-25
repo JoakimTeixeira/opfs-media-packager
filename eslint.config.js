@@ -144,9 +144,14 @@ export default [
     },
   },
   {
-    files: ["**/*.test.ts", "**/*.spec.ts"],
+    files: ["lib/**/*.ts", "**/*.test.ts", "**/*.spec.ts"],
     rules: {
       "max-lines": ["error", { max: 400 }],
+    },
+  },
+  {
+    files: ["**/*.test.ts", "**/*.spec.ts"],
+    rules: {
       complexity: "off",
     },
   },

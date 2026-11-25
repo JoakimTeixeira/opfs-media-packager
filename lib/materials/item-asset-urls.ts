@@ -170,3 +170,25 @@ export function resolveSafeUrl(raw: unknown, pageUrl: string): string | null {
 
   return safeMediaUrl(new URL(trimmed, safePage).href);
 }
+
+export const PDF_EXTENSION_PATTERN = /\.pdf(?:$|[?#])/i;
+
+export function basenameFromString(raw: string): string {
+  if (!raw) return "";
+
+  const last = raw.split(/[\\/]/).pop();
+
+  return last ? last.trim() : "";
+}
+
+export function filenameFromUrl(url: string, fallback: string): string {
+  const segment = new URL(url).pathname.split("/").filter(Boolean).pop() ?? "";
+
+  if (!segment) return fallback;
+
+  try {
+    return basenameFromString(decodeURIComponent(segment)) || fallback;
+  } catch {
+    return basenameFromString(segment) || fallback;
+  }
+}

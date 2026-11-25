@@ -70,3 +70,16 @@ export function isItemDownloadableForMode(
 
   return hasVideo || hasSubtitles || hasDocuments;
 }
+
+/**
+ * Returns an empty frozen ItemCompanionDocuments object.
+ */
+export function emptyItemCompanionDocuments(): ItemCompanionDocuments {
+  return Object.freeze({
+    markdown: "",
+    images: Object.freeze([]),
+    pdfs: Object.freeze([]),
+    diagrams: Object.freeze([]),
+    slides: Object.freeze([]),
+  });
+}
