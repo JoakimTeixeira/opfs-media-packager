@@ -48,6 +48,7 @@ The test pyramid keeps most tests fast at the unit layer. Integration and browse
 
 ## Test design rules
 
+- Keep test files at or below 400 physical lines, including blank lines and comments. ESLint enforces the limit for test and spec files; five existing suites are temporarily exempt while their fixtures and scenarios are extracted.
 - Start with a focused test around the rule that needs to change. This creates a safe seam in existing code before refactoring.
 - Assert visible behaviour and meaningful state. Avoid asserting private implementation details unless they enforce a security or browser contract.
 - Use local fake servers for network cases. They make authorization, rate-limit, retry, and timeout behaviour repeatable.

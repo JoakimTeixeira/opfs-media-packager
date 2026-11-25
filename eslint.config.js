@@ -143,6 +143,25 @@ export default [
       "sonarjs/no-identical-functions": "off",
     },
   },
+  {
+    files: ["tests/**/*.test.ts", "tests/**/*.spec.ts"],
+    rules: {
+      "max-lines": ["error", { max: 400 }],
+    },
+  },
+  // Existing large suites need fixture and scenario extraction before the limit applies.
+  {
+    files: [
+      "tests/e2e/download-page.spec.ts",
+      "tests/e2e/playlist-headless.spec.ts",
+      "tests/integration/headless-playlist-scan.test.ts",
+      "tests/integration/page-playlist-probe.test.ts",
+      "tests/item-assets.test.ts",
+    ],
+    rules: {
+      "max-lines": "off",
+    },
+  },
   // Disables ESLint rules that conflict with Prettier formatting
   prettierConfig,
   // Re-enable multi-line braces after prettierConfig for unambiguous wrapped blocks
