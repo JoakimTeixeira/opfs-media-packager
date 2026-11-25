@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import {
   countItemCompanionDocuments,
   summarizeItemCompanionDocuments,
-  type ItemFileAsset,
-  type ItemLinkAsset,
-  type ItemCompanionDocuments,
   isItemDownloadableForMode,
+} from "./item-asset-availability.ts";
+import type {
+  ItemFileAsset,
+  ItemLinkAsset,
+  ItemCompanionDocuments,
 } from "./item-assets.ts";
 
 test("should count and summarize lesson materials accurately", () => {

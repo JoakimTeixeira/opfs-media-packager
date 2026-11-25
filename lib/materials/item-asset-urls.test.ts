@@ -5,7 +5,7 @@ import {
   isExcalidrawUrl,
   canonicalDocumentUrlKey,
   activeStorageBlobUrl,
-} from "./item-assets.ts";
+} from "./item-asset-urls.ts";
 
 test("should detect interactive slide deck URLs while filtering repos, videos, courses, and static files", () => {
   assert.equal(

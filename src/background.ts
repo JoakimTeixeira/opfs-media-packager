@@ -1,3 +1,4 @@
+import { knownSubtitleTracksFromPage } from "../lib/security/page-subtitles.ts";
 import { languageInText } from "../lib/subtitles/subtitle-language.ts";
 import { decodeSubtitleBytes } from "../lib/subtitles/subtitle-encoding.ts";
 import {
@@ -50,7 +51,6 @@ import {
   isTrustedExtensionSender,
   isTrustedPlaylistSender,
   isTrustedPlaylistFrameSender,
-  knownSubtitleTracksFromPage,
   validatedDownloadRequest,
   type ValidatedDownloadRequest,
 } from "../lib/security/extension-messages.ts";

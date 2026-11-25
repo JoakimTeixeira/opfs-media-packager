@@ -16,11 +16,11 @@ New or changed test names should start with `should` and describe one observable
 
 The test pyramid keeps most tests fast at the unit layer. Integration and browser tests cover the connections that unit tests cannot observe. Mutation testing checks whether the tests would catch common implementation mistakes.
 
-Unit tests sit beside their modules in feature folders under `lib/` and run with Vitest. Cross-module tests live in feature folders under `tests/integration/` and run with Node.js. Browser flows live in feature folders under `tests/e2e/` and run with Playwright. `tests/contract/` checks packaging, security, and documentation agreements, while `tests/architecture/` checks dependency boundaries. Coverage and mutation runs use the Vitest unit tests.
+Each TypeScript source file in `lib/` and `src/` has a colocated test file, run with Vitest. Cross-module tests live in feature folders under `tests/integration/` and run with Node.js. Browser flows live in feature folders under `tests/e2e/` and run with Playwright. `tests/contract/` checks packaging, security, and documentation agreements, while `tests/architecture/` checks dependency boundaries. Coverage and mutation runs use the Vitest unit tests.
 
 Feature-specific `__fixtures__/` folders hold prepared test inputs. Feature-specific `__mocks__/` folders hold simulated dependencies, such as the playlist scan's mocked Chrome APIs. Shared browser lifecycle helpers live in `tests/e2e/support/`. These helpers use explicit imports; folder names do not enable automatic mocking in this project.
 
-Each reusable module owns its colocated unit tests. When a module has several test files, the files share the module's name and identify the behaviour they cover. The extension entry points in `src/` are covered by integration, contract, and browser tests: playlist scans exercise `background.ts`, `content.ts`, and `page-playlist-probe.ts`, while browser download and playlist flows exercise `app.ts`, `popup.ts`, and `playlist.ts`.
+Each source module owns its matching unit test file. Source-page tests replace browser dependencies with test doubles, and wider integration, contract, and browser tests exercise the connections between modules. Playlist scans exercise `background.ts`, `content.ts`, and `page-playlist-probe.ts`, while browser download and playlist flows exercise `app.ts`, `popup.ts`, and `playlist.ts`.
 
 ## Test techniques and intent
 

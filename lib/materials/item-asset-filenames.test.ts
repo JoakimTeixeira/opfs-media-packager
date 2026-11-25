@@ -1,6 +1,9 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
-import { itemNumberPrefix, prefixedDocumentFilename } from "./item-assets.ts";
+import {
+  itemNumberPrefix,
+  prefixedDocumentFilename,
+} from "./item-asset-filenames.ts";
 
 test("should extract lesson number prefix and format Windows-safe prefixed material filenames", () => {
   assert.equal(

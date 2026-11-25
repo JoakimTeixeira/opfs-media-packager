@@ -1,6 +1,6 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
-import { knownSubtitleTracksFromPage } from "./extension-messages.ts";
+import { knownSubtitleTracksFromPage } from "./page-subtitles.ts";
 
 test("should bound and remove unsafe page-provided subtitle candidates", () => {
   const manyTracks = Array.from({ length: 21 }, (_, index) => ({

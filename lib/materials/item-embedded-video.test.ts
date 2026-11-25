@@ -1,11 +1,11 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
 import {
-  emptyItemCompanionDocuments,
   extractFeaturedMediaEmbed,
   normalizeEmbeddedVideoUrl,
   withEmbeddedVideoMarkdown,
-} from "./item-assets.ts";
+} from "./item-embedded-video.ts";
+import { emptyItemCompanionDocuments } from "./item-assets.ts";
 
 test("should normalize embedded video URLs and include videos in lesson Markdown", () => {
   const pageUrl =

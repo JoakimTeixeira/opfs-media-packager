@@ -5,6 +5,7 @@ export default {
   mutate: [
     "lib/security/security.ts",
     "lib/security/extension-messages.ts",
+    "lib/security/page-subtitles.ts",
     "lib/media/media-authorization.ts",
     "lib/media/media-request.ts",
     "lib/downloads/download-control-state.ts",

@@ -97,6 +97,37 @@ test("should keep selected reusable rules free of direct browser-global access",
   }
 });
 
+test("should pair every source module with one colocated unit test", async () => {
+  const { readdir } = await import("node:fs/promises");
+
+  for (const directory of ["src", "lib"]) {
+    const root = new URL(`../../${directory}/`, import.meta.url);
+
+    const files = (await readdir(root, { recursive: true }))
+      .map((name) => name.replaceAll("\\", "/"))
+      .filter(
+        (name) =>
+          name.endsWith(".ts") &&
+          !name
+            .split("/")
+            .some((part) => ["__mocks__", "__fixtures__"].includes(part)),
+      );
+
+    const paths = new Set(files);
+
+    for (const file of files) {
+      const counterpart = file.endsWith(".test.ts")
+        ? file.replace(/\.test\.ts$/, ".ts")
+        : file.replace(/\.ts$/, ".test.ts");
+
+      assert.ok(
+        paths.has(counterpart),
+        `${directory}/${file} needs ${counterpart}`,
+      );
+    }
+  }
+});
+
 test("should keep reusable modules independent of extension entry points", async () => {
   const { readdir } = await import("node:fs/promises");
   const root = new URL("../../lib/", import.meta.url);

@@ -2,152 +2,14 @@ import { test } from "vitest";
 import assert from "node:assert/strict";
 import {
   annotateMarkdownWithDownloadedArtifacts,
-  cleanItemMarkdown,
-  htmlBodyToMarkdown,
-  sanitizeMarkdownText,
   stripRelatedContentSections,
+} from "./item-markdown-artifacts.ts";
+import { canonicalDocumentUrlKey } from "./item-asset-urls.ts";
+import {
+  cleanItemMarkdown,
   tiptapJsonToMarkdown,
   type TiptapNode,
 } from "./item-markdown.ts";
-import { canonicalDocumentUrlKey } from "./item-assets.ts";
-
-test("should handle empty HTML, unresolvable hrefs, and bare relative paths cleanly", () => {
-  assert.equal(htmlBodyToMarkdown(""), "");
-
-  assert.equal(
-    htmlBodyToMarkdown("   ", { title: "Empty Title" }),
-    "# Empty Title\n",
-  );
-
-  assert.equal(
-    htmlBodyToMarkdown(
-      '<p><a href="/docs/guide">Guide</a> and <a href="local.html">Local</a> and <a href="#sec">Sec</a></p>',
-    ),
-    "[Guide](/docs/guide) and Local and Sec\n",
-  );
-
-  assert.equal(
-    htmlBodyToMarkdown('<p><a href="/bad">BadPage</a></p>', {
-      pageUrl: "http://localhost/lesson",
-    }),
-    "[BadPage](/bad)\n",
-  );
-
-  assert.equal(
-    htmlBodyToMarkdown('<p><a href="sub.html">Sub</a></p>', {
-      pageUrl: "http://localhost/lesson",
-    }),
-    "Sub\n",
-  );
-
-  assert.equal(
-    htmlBodyToMarkdown(
-      '<p>1 < 2</p><p data-empty="true"></p><p><a href="https://cdn.example/ok" title="a > b">Link</a></p>',
-    ),
-    "1 < 2\n\n[Link](https://cdn.example/ok)\n",
-  );
-
-  assert.equal(
-    htmlBodyToMarkdown('<p><a href="http://[invalid">BadUrl</a></p>', {
-      pageUrl: "https://training.example/lesson",
-    }),
-    "BadUrl\n",
-  );
-
-  assert.equal(
-    htmlBodyToMarkdown('<p><a href="/valid" data-x="1">Path</a></p>', {
-      pageUrl: "https://training.example/lesson",
-    }),
-    "[Path](https://training.example/valid)\n",
-  );
-});
-
-test("should sanitize invisible, surrogate, replacement, variation-selector, and PUA glyphs while preserving valid accents and code tabs", () => {
-  const dirty =
-    "\uFEFF\uD83DOlá\u200B,\u00A0mundo\uFFFD\uFFFC\u0007\u007F\u0085!\u2028" +
-    "\u2029\tTabbed\u000BLine\uFE0F\u{E0100}\u{F0001}👍\uDFFF";
-
-  assert.equal(sanitizeMarkdownText(dirty), "Olá, mundo!\n\n Tabbed Line👍");
-
-  assert.equal(
-    sanitizeMarkdownText("a\tb\u200B", { preserveTabs: true }),
-    "a\tb",
-  );
-
-  assert.equal(sanitizeMarkdownText("\uF0B7 Primeiro item"), "• Primeiro item");
-
-  const pastedBulletsDoc: TiptapNode = {
-    type: "doc",
-    content: [
-      {
-        type: "heading",
-        attrs: { level: 2 },
-        content: [{ type: "text", text: "Links\u200B Úteis\uFE0F" }],
-      },
-      {
-        type: "paragraph",
-        content: [
-          { type: "text", text: "•\uFE0F\uFFFC " },
-          {
-            type: "text",
-            text: "https://tool-one.example/",
-            marks: [
-              {
-                type: "link",
-                attrs: { href: "https://tool-one.example/" },
-              },
-            ],
-          },
-        ],
-      },
-      {
-        type: "paragraph",
-        content: [
-          { type: "text", text: "•\u200B " },
-          {
-            type: "text",
-            text: "https://tool-two.example/",
-            marks: [
-              { type: "link", attrs: { href: "https://tool-two.example/" } },
-            ],
-          },
-        ],
-      },
-      {
-        type: "paragraph",
-        content: [
-          { type: "text", text: "\uF0B7 Normal line" },
-          { type: "hardBreak" },
-          { type: "text", text: "Second line" },
-        ],
-      },
-      {
-        type: "codeBlock",
-        content: [{ type: "text", text: "• keep\uFE0F\tindent" }],
-      },
-    ],
-  };
-
-  assert.equal(
-    tiptapJsonToMarkdown(pastedBulletsDoc, { title: "1.1 Aula\u200B" }),
-    [
-      "# 1.1 Aula",
-      "",
-      "## Links Úteis",
-      "",
-      "- [https://tool-one.example/](https://tool-one.example/)",
-      "- [https://tool-two.example/](https://tool-two.example/)",
-      "",
-      "- Normal line  ",
-      "Second line",
-      "",
-      "```",
-      "• keep\tindent",
-      "```",
-      "",
-    ].join("\n"),
-  );
-});
 
 test("should annotate Markdown inline links and non-inline attachments with downloaded or reused filenames", () => {
   assert.equal(
@@ -373,5 +235,54 @@ test("should strip Conteúdos relacionados headings and standalone bold link lis
   assert.equal(
     tiptapJsonToMarkdown(tiptapWithRelated),
     "## Resumo\n\nConteúdo útil.\n",
+  );
+});
+
+test("should annotate linked video and note artifacts", () => {
+  const parentAnnotated = annotateMarkdownWithDownloadedArtifacts(
+    [
+      "# 3.10 Padrões de Fluxo",
+      "",
+      "[Aula Exemplo](https://training.example/c/community/sample-lesson)",
+      "",
+      "[Anotações](https://training.example/c/community/notes)",
+      "",
+    ].join("\n"),
+    [
+      {
+        kind: "video",
+        url: "https://training.example/c/community/sample-lesson",
+        filename: "3.10 Aula Exemplo.mp4",
+      },
+      {
+        kind: "note",
+        url: "https://training.example/c/community/sample-lesson",
+        filename: "3.10 Aula Exemplo.md",
+      },
+      {
+        kind: "note",
+        url: "https://training.example/c/community/notes",
+        filename: "3.10 Anotacoes.md",
+      },
+    ],
+    canonicalDocumentUrlKey,
+  );
+
+  assert.ok(
+    parentAnnotated.includes(
+      "[Aula Exemplo](https://training.example/c/community/sample-lesson) — Baixado como `3.10 Aula Exemplo.mp4`",
+    ),
+  );
+
+  assert.ok(
+    parentAnnotated.includes(
+      "[Anotações](https://training.example/c/community/notes) — Baixado como `3.10 Anotacoes.md`",
+    ),
+  );
+
+  assert.ok(
+    parentAnnotated.includes(
+      "## Arquivos baixados\n\n- Nota: `3.10 Aula Exemplo.md` (baixado)\n",
+    ),
   );
 });

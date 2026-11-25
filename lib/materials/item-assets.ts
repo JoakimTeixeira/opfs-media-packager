@@ -1,20 +1,43 @@
-import type { PlaylistDownloadMode } from "../downloads/download-preferences.ts";
+import {
+  stringField,
+  resolveSafeUrl,
+  activeStorageBlobUrl,
+  isExcalidrawUrl,
+  isSlidesDeckUrl,
+  canonicalDocumentUrlKey,
+} from "./item-asset-urls.ts";
+import { withEmbeddedVideoMarkdown } from "./item-embedded-video.ts";
+import { countItemCompanionDocuments } from "./item-asset-availability.ts";
 import {
   externalRecord,
   type ExternalRecord,
 } from "../security/external-values.ts";
-import { sanitizeFilenameStem } from "../shared/filename.ts";
 import {
   htmlBodyToMarkdown,
-  sanitizeMarkdownText,
   tiptapJsonToMarkdown,
   type TiptapEntityRef,
   type TiptapMark,
   type TiptapNode,
 } from "./item-markdown.ts";
 import { scoreLinkedVideoUrl } from "./linked-video.ts";
-import { safeMediaUrl } from "../security/security.ts";
 
+export {
+  normalizeEmbeddedVideoUrl,
+  extractFeaturedMediaEmbed,
+  withEmbeddedVideoMarkdown,
+} from "./item-embedded-video.ts";
+export {
+  activeStorageBlobUrl,
+  isExcalidrawUrl,
+  isSlidesDeckUrl,
+  canonicalDocumentUrlKey,
+} from "./item-asset-urls.ts";
+export { prefixedDocumentFilename } from "./item-asset-filenames.ts";
+export {
+  countItemCompanionDocuments,
+  summarizeItemCompanionDocuments,
+  isItemDownloadableForMode,
+} from "./item-asset-availability.ts";
 export interface ItemFileAsset {
   readonly kind: "image" | "pdf";
   readonly url: string;
@@ -49,36 +72,9 @@ export interface ItemCompanionDocuments {
   readonly extraNotes?: readonly ItemMarkdownNote[];
 }
 
-const ACTIVE_STORAGE_REPR_PATTERN =
-  /^(.*)\/rails\/active_storage\/representations\/(redirect|proxy)\/([^/]+)\/[^/]+\/([^/]+)$/;
-
-const ACTIVE_STORAGE_LEGACY_REPR_PATTERN =
-  /^(.*)\/rails\/active_storage\/representations\/([^/]+)\/[^/]+\/([^/]+)$/;
-
-const EXCALIDRAW_HOST_PATTERN = /(?:^|\.)excalidraw\.com$/i;
-
 const PDF_EXTENSION_PATTERN = /\.pdf(?:$|[?#])/i;
 
 const IMAGE_EXTENSION_PATTERN = /\.(?:png|jpe?g|webp|gif|bmp|avif)(?:$|[?#])/i;
-
-const NON_SLIDES_EXTENSION_PATTERN =
-  /\.(?:pdf|png|jpe?g|gif|webp|svg|bmp|avif|ico)$/i;
-
-const PLAYLIST_ITEM_ROUTE_PATTERN =
-  /^\/c\/.+\/lessons(?:\/|$)|^\/courses(?:\/|$)/i;
-
-const EXCLUDED_SLIDES_HOST_PATTERN =
-  /(?:^|\.)(?:github\.com|youtube\.com|youtu\.be|linkedin\.com|x\.com|twitter\.com|amazon\.com|npmjs\.com)$/i;
-
-const SLIDES_ANCHOR_TITLE_PATTERN = /\b(?:slides?|apresenta[cç][aã]o|deck)\b/i;
-
-const ITEM_NUMBER_PREFIX_PATTERN = /^(\d+(?:\.\d+)*)\s+/;
-
-const MAX_DOCUMENT_STEM_LENGTH = 116;
-
-function stringField(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
 
 function basenameFromString(raw: string): string {
   if (!raw) return "";
@@ -86,28 +82,6 @@ function basenameFromString(raw: string): string {
   const last = raw.split(/[\\/]/).pop();
 
   return last ? last.trim() : "";
-}
-
-function resolveSafeUrl(raw: unknown, pageUrl: string): string | null {
-  const trimmed = stringField(raw);
-
-  if (!trimmed) return null;
-
-  if (/^https?:\/\//i.test(trimmed)) {
-    return safeMediaUrl(
-      trimmed.replace(/^https?:\/\//i, (scheme) => scheme.toLowerCase()),
-    );
-  }
-
-  if (/^[a-z][a-z0-9+.-]*:/i.test(trimmed) || trimmed.startsWith("//")) {
-    return null;
-  }
-
-  const safePage = safeMediaUrl(pageUrl);
-
-  if (!safePage) return null;
-
-  return safeMediaUrl(new URL(trimmed, safePage).href);
 }
 
 function filenameFromUrl(url: string, fallback: string): string {
@@ -120,131 +94,6 @@ function filenameFromUrl(url: string, fallback: string): string {
   } catch {
     return basenameFromString(segment) || fallback;
   }
-}
-
-/**
- * Rewrites an ActiveStorage representation URL to its original blob URL while
- * preserving origin and mode, or returns null for non-representation URLs.
- */
-export function activeStorageBlobUrl(rawUrl: string): string | null {
-  const safe = safeMediaUrl(rawUrl);
-
-  if (!safe) return null;
-
-  const parsed = new URL(safe);
-  const direct = ACTIVE_STORAGE_REPR_PATTERN.exec(parsed.pathname);
-
-  if (direct) {
-    return `${parsed.origin}${direct[1]}/rails/active_storage/blobs/${direct[2]}/${direct[3]}/${direct[4]}`;
-  }
-
-  const legacy = ACTIVE_STORAGE_LEGACY_REPR_PATTERN.exec(parsed.pathname);
-
-  if (legacy) {
-    return `${parsed.origin}${legacy[1]}/rails/active_storage/blobs/redirect/${legacy[2]}/${legacy[3]}`;
-  }
-
-  return null;
-}
-
-/**
- * Returns true for safe HTTP(S) URLs hosted on excalidraw.com or a subdomain.
- */
-export function isExcalidrawUrl(rawUrl: string): boolean {
-  const safe = safeMediaUrl(rawUrl);
-
-  if (!safe) return false;
-
-  return EXCALIDRAW_HOST_PATTERN.test(new URL(safe).hostname);
-}
-
-function isDeckLikePath(pathname: string): boolean {
-  return (
-    pathname === "/" || /\.html?$/i.test(pathname) || /\/slides/i.test(pathname)
-  );
-}
-
-function isExcludedSlidesTarget(parsed: URL): boolean {
-  return (
-    parsed.protocol !== "https:" ||
-    isExcalidrawUrl(parsed.href) ||
-    NON_SLIDES_EXTENSION_PATTERN.test(parsed.pathname) ||
-    PLAYLIST_ITEM_ROUTE_PATTERN.test(parsed.pathname) ||
-    EXCLUDED_SLIDES_HOST_PATTERN.test(parsed.hostname)
-  );
-}
-
-/**
- * Returns true when a safe HTTPS URL looks like an interactive slide deck
- * rather than a repo, video, playlist item, or static binary asset.
- */
-export function isSlidesDeckUrl(rawUrl: string, anchorTitle?: string): boolean {
-  const safe = safeMediaUrl(rawUrl);
-
-  if (!safe) return false;
-
-  const parsed = new URL(safe);
-
-  if (isExcludedSlidesTarget(parsed)) return false;
-
-  const slideParam = parsed.searchParams.get("slide");
-
-  if (slideParam !== null && /^\d+$/.test(slideParam)) return true;
-
-  return Boolean(
-    anchorTitle &&
-    SLIDES_ANCHOR_TITLE_PATTERN.test(anchorTitle) &&
-    isDeckLikePath(parsed.pathname),
-  );
-}
-
-function stripTrailingPathSlash(pathname: string): string {
-  return pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-}
-
-/**
- * Normalizes a item document URL into a stable canonical key so identical
- * assets across items (representations vs. blobs, trailing slashes, slide
- * query parameters) are deduplicated reliably.
- */
-export function canonicalDocumentUrlKey(
-  rawUrl: string,
-  kind: ItemFileAsset["kind"] | ItemLinkAsset["kind"] | "note" | "video",
-): string {
-  const safe = safeMediaUrl(rawUrl);
-
-  if (!safe) return rawUrl.trim();
-
-  const normalized =
-    kind === "image" || kind === "pdf"
-      ? activeStorageBlobUrl(safe) || safe
-      : safe;
-
-  const parsed = new URL(normalized);
-
-  parsed.pathname = stripTrailingPathSlash(parsed.pathname);
-
-  if (kind === "slides") {
-    const slideParam = parsed.searchParams.get("slide");
-
-    if (slideParam !== null && /^\d+$/.test(slideParam)) {
-      parsed.searchParams.delete("slide");
-    }
-
-    parsed.hash = "";
-
-    return parsed.href;
-  }
-
-  if (kind === "diagram") {
-    if (parsed.hash.length <= 1) parsed.hash = "";
-
-    return parsed.href;
-  }
-
-  parsed.hash = "";
-
-  return parsed.href;
 }
 
 interface DocumentCollector {
@@ -590,48 +439,7 @@ function collectBodyImageNode(
   });
 }
 
-const YOUTUBE_EMBED_HOST_PATTERN = /(?:^|\.)youtube(?:-nocookie)?\.com$/i;
-const YOUTUBE_EMBED_PATH_PATTERN = /^\/embed\/([A-Za-z0-9_-]{6,})/i;
 const RELATED_HEADING_PATTERN = /^conte[uú]dos?\s+relacionados?\b/i;
-
-function extractYouTubeVideoId(url: string): string {
-  const parsed = new URL(url);
-
-  if (parsed.hostname === "youtu.be") {
-    return parsed.pathname.split("/").filter(Boolean)[0] ?? "";
-  }
-
-  if (!YOUTUBE_EMBED_HOST_PATTERN.test(parsed.hostname)) return "";
-
-  const embedMatch = YOUTUBE_EMBED_PATH_PATTERN.exec(parsed.pathname);
-
-  if (embedMatch) return embedMatch[1];
-
-  return parsed.searchParams.get("v") ?? "";
-}
-
-/**
- * Normalizes embedded player URLs (converting YouTube `/embed/<id>` URLs into
- * canonical `watch?v=<id>` links) after validating HTTP(S) safety.
- */
-export function normalizeEmbeddedVideoUrl(
-  rawUrl: string,
-  pageUrl: string,
-): string | null {
-  const resolved = resolveSafeUrl(rawUrl, pageUrl);
-
-  if (!resolved) return null;
-
-  const parsed = new URL(resolved);
-
-  if (YOUTUBE_EMBED_HOST_PATTERN.test(parsed.hostname)) {
-    const match = YOUTUBE_EMBED_PATH_PATTERN.exec(parsed.pathname);
-
-    if (match) return `https://www.youtube.com/watch?v=${match[1]}`;
-  }
-
-  return resolved;
-}
 
 function addEntityEntry(
   target: Map<string, TiptapEntityRef>,
@@ -683,118 +491,6 @@ export function buildTiptapEntityMap(
   }
 
   return map;
-}
-
-/**
- * Extracts an external embedded video URL and title from `featured_media_embed`
- * on a item or post payload, normalizing iframe/embed URLs when needed.
- */
-export function extractFeaturedMediaEmbed(
-  payload: unknown,
-  pageUrl: string,
-): { readonly url: string; readonly title: string } | null {
-  const root = externalRecord(payload);
-
-  if (!root) return null;
-
-  const item = externalRecord(root.lesson);
-  const post = externalRecord(root.post);
-
-  const embed =
-    externalRecord(root.featured_media_embed) ??
-    externalRecord(item?.featured_media_embed) ??
-    externalRecord(post?.featured_media_embed);
-
-  if (!embed) return null;
-
-  const htmlText = stringField(embed.html);
-
-  const iframeSrc = htmlText
-    ? (/<iframe[^>]+src=["']([^"']+)["']/i.exec(htmlText)?.[1] ?? "")
-    : "";
-
-  const url = normalizeEmbeddedVideoUrl(
-    stringField(embed.content) || iframeSrc,
-    pageUrl,
-  );
-
-  if (!url) return null;
-
-  return Object.freeze({ url, title: stringField(embed.title) });
-}
-
-function markdownContainsVideoLink(markdown: string, url: string): boolean {
-  if (markdown.includes(url)) return true;
-
-  const videoId = extractYouTubeVideoId(url);
-
-  if (!videoId) return false;
-
-  return (
-    markdown.includes(`v=${videoId}`) ||
-    markdown.includes(`youtu.be/${videoId}`) ||
-    markdown.includes(`/embed/${videoId}`)
-  );
-}
-
-function formatNonEmptyMarkdownWithVideo(
-  current: string,
-  videoLine: string,
-  fallbackTitle: string,
-): string {
-  const firstNewline = current.indexOf("\n");
-
-  if (current.startsWith("# ") && firstNewline >= 0) {
-    const heading = current.slice(0, firstNewline);
-    const rest = current.slice(firstNewline).replace(/^\n+/, "");
-
-    return `${heading}\n\n${videoLine}\n\n${rest}\n`;
-  }
-
-  if (current.startsWith("# ")) return `${current}\n\n${videoLine}\n`;
-
-  const cleanTitle = sanitizeMarkdownText(fallbackTitle).trim();
-  const header = cleanTitle ? `# ${cleanTitle}\n\n` : "";
-
-  return `${header}${videoLine}\n\n${current}\n`;
-}
-
-function formatEmptyMarkdownWithVideo(
-  videoLine: string,
-  cleanFallback: string,
-): string {
-  return cleanFallback
-    ? `# ${cleanFallback}\n\n${videoLine}\n`
-    : `${videoLine}\n`;
-}
-
-/**
- * Ensures an embedded external video (such as a YouTube item player) is
- * included in the item's Markdown note without duplicating an existing link.
- */
-export function withEmbeddedVideoMarkdown(
-  documents: ItemCompanionDocuments,
-  embeddedVideo: EmbeddedVideoLink | null | undefined,
-  fallbackTitle?: string,
-): ItemCompanionDocuments {
-  const safeUrl = embeddedVideo?.url ? safeMediaUrl(embeddedVideo.url) : null;
-
-  if (!safeUrl || markdownContainsVideoLink(documents.markdown, safeUrl)) {
-    return documents;
-  }
-
-  const linkTitle =
-    sanitizeMarkdownText(embeddedVideo?.title ?? "").trim() || safeUrl;
-
-  const videoLine = `**Vídeo:** [${linkTitle}](${safeUrl})`;
-  const current = documents.markdown.trimEnd();
-  const cleanFallback = sanitizeMarkdownText(fallbackTitle ?? "").trim();
-
-  const markdown = current
-    ? formatNonEmptyMarkdownWithVideo(current, videoLine, cleanFallback)
-    : formatEmptyMarkdownWithVideo(videoLine, cleanFallback);
-
-  return Object.freeze({ ...documents, markdown });
 }
 
 function collectNodePlainText(
@@ -1389,133 +1085,4 @@ export function extractItemCompanionDocumentsFromLinksAndHtml(input: {
     input.embeddedVideo,
     input.title,
   );
-}
-
-/**
- * Extracts a leading outline number prefix such as `"2.4 "` from a item
- * title, or returns `""` when no leading numbering prefix exists.
- */
-export function itemNumberPrefix(itemTitle: string): string {
-  const match = ITEM_NUMBER_PREFIX_PATTERN.exec(itemTitle.trimStart());
-
-  return match ? `${match[1]} ` : "";
-}
-
-function sanitizeOptionalStem(raw: string): string | null {
-  const trimmed = raw.trim();
-
-  if (!trimmed) return null;
-
-  const sanitized = sanitizeFilenameStem(trimmed);
-
-  if (sanitized === "video" && !/\bvideo\b/i.test(trimmed)) return null;
-
-  return sanitized;
-}
-
-/**
- * Builds a Windows-safe document filename prefixed with the item outline
- * number (without duplicating an existing prefix) and bounded in length.
- */
-export function prefixedDocumentFilename(
-  itemTitle: string,
-  rawName: string,
-  extension: string,
-  fallbackStem?: string,
-): string {
-  const cleanExt = extension.trim().replace(/^\.+/, "").toLowerCase() || "bin";
-
-  const escapedExt = cleanExt.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-  const stripped = rawName
-    .trim()
-    .replace(new RegExp(`\\.${escapedExt}$`, "i"), "");
-
-  const stem =
-    sanitizeOptionalStem(stripped) ??
-    sanitizeOptionalStem(fallbackStem ?? "") ??
-    "document";
-
-  const prefix = itemNumberPrefix(itemTitle);
-
-  const alreadyPrefixed =
-    Boolean(prefix) && (stem.startsWith(prefix) || stem === prefix.trimEnd());
-
-  const withPrefix = prefix && !alreadyPrefixed ? `${prefix}${stem}` : stem;
-
-  const bounded = withPrefix
-    .slice(0, MAX_DOCUMENT_STEM_LENGTH)
-    .replace(/[.\s-]+$/g, "");
-
-  return `${bounded}.${cleanExt}`;
-}
-
-/**
- * Returns the total count of extracted documents for a item.
- */
-export function countItemCompanionDocuments(
-  documents: ItemCompanionDocuments | null | undefined,
-): number {
-  if (!documents) return 0;
-
-  return (
-    (documents.markdown ? 1 : 0) +
-    (documents.extraNotes?.length ?? 0) +
-    documents.images.length +
-    documents.pdfs.length +
-    documents.diagrams.length +
-    documents.slides.length
-  );
-}
-
-function pluralBadge(
-  count: number,
-  singular: string,
-  plural = `${singular}s`,
-): readonly string[] {
-  if (count <= 0) return [];
-
-  return [`${count} ${count === 1 ? singular : plural}`];
-}
-
-/**
- * Returns concise human-readable summary badges for a item's documents.
- */
-export function summarizeItemCompanionDocuments(
-  documents: ItemCompanionDocuments | null | undefined,
-): string[] {
-  if (!documents) return [];
-
-  return [
-    ...(documents.markdown || documents.extraNotes?.length ? ["MD"] : []),
-    ...pluralBadge(documents.pdfs.length, "PDF"),
-    ...pluralBadge(documents.images.length, "image"),
-    ...pluralBadge(documents.diagrams.length, "diagram"),
-    ...pluralBadge(documents.slides.length, "slides", "slides"),
-  ];
-}
-
-/**
- * Returns true when a discovered item contains at least one downloadable
- * item applicable to the selected playlist download mode.
- */
-export function isItemDownloadableForMode(
-  item: {
-    readonly url?: string;
-    readonly qualityOptions?: readonly unknown[];
-    readonly subtitles?: readonly unknown[];
-    readonly documents?: ItemCompanionDocuments | null;
-  },
-  mode: PlaylistDownloadMode,
-): boolean {
-  const hasVideo =
-    Boolean(item.url?.trim()) || Boolean(item.qualityOptions?.length);
-
-  const hasSubtitles = Boolean(item.subtitles?.length);
-  const hasDocuments = countItemCompanionDocuments(item.documents) > 0;
-
-  if (mode === "documents") return hasDocuments;
-  if (mode === "videos") return hasVideo || hasSubtitles;
-
-  return hasVideo || hasSubtitles || hasDocuments;
 }
