@@ -1,3 +1,15 @@
+import {
+  errorMessageOf,
+  isAbortError,
+  userError,
+  formatBytes,
+} from "./download-display.ts";
+import {
+  parsePlaylist,
+  type MediaSegment,
+  type MasterPlaylistAnalysis,
+  type MediaPlaylistAnalysis,
+} from "./hls-parser.ts";
 import { downloadControlState } from "../lib/downloads/download-control-state.ts";
 import {
   shouldHaltPlaylistQueue,
@@ -33,12 +45,7 @@ import {
   subtitleFilename,
   videoFilename,
 } from "../lib/shared/filename.ts";
-import {
-  parseHlsAttributes,
-  qualityOptionKey,
-  sortHlsQualityOptions,
-  type VideoQualityOption,
-} from "../lib/media/hls-master.ts";
+import { type VideoQualityOption } from "../lib/media/hls-master.ts";
 import { icon, type IconName } from "../lib/shared/icons.ts";
 import {
   OPFS_JOB_PREFIX,
@@ -86,46 +93,6 @@ import {
 import { isDirectVideoUrl } from "../lib/media/stream-identity.ts";
 import type { KnownSubtitleTrack } from "../lib/subtitles/subtitle-tracks.ts";
 import { FFmpeg } from "../vendor/ffmpeg/classes.js";
-
-interface ByteRange {
-  readonly start: number;
-  readonly end: number;
-  readonly header: string;
-}
-
-interface MediaMap {
-  readonly uri: string;
-  readonly range: ByteRange | null;
-}
-
-interface MediaSegment {
-  readonly uri: string;
-  readonly range: ByteRange | null;
-  readonly sequence?: number;
-  readonly discontinuity?: boolean;
-}
-
-interface AnalyzedQualityOption {
-  readonly uri: string;
-  readonly label: string;
-  readonly bandwidth: number;
-  readonly codecs: string;
-}
-
-interface MasterPlaylistAnalysis {
-  readonly type: "master";
-  readonly qualityOptions: AnalyzedQualityOption[];
-}
-
-interface MediaPlaylistAnalysis {
-  readonly type: "media";
-  readonly segments: MediaSegment[];
-  readonly map: MediaMap | null;
-  readonly complete: boolean;
-  readonly totalDurationSeconds: number;
-}
-
-type PlaylistAnalysis = MasterPlaylistAnalysis | MediaPlaylistAnalysis;
 
 interface ActiveDownloadJob {
   readonly state:
@@ -494,55 +461,6 @@ async function saveDownloadSubfolder(): Promise<void> {
   );
 }
 
-function errorMessageOf(error: unknown): string {
-  if (error instanceof Error) return error.message;
-
-  return String(error || "");
-}
-
-function isAbortError(error: unknown): boolean {
-  return (
-    (error instanceof DOMException || error instanceof Error) &&
-    error.name === "AbortError"
-  );
-}
-
-function userError(error: unknown): string {
-  const technical = errorMessageOf(error);
-
-  console.error("OPFS Media Packager", error);
-
-  if (/\b(?:401|403)\b/.test(technical)) {
-    return "This video host could not confirm access. Keep the source page open and signed in, refresh it, then try again.";
-  }
-
-  if (/encrypted/i.test(technical)) {
-    return "This video is protected and cannot be downloaded by this extension.";
-  }
-
-  if (/live|unfinished/i.test(technical)) {
-    return "Only completed, on-demand videos are supported.";
-  }
-
-  if (/quota|storage|OPFS/i.test(technical)) {
-    return "Not enough free browser storage space to assemble this video. Free some disk space, then try again.";
-  }
-
-  if (
-    /MP4 engine|FFmpeg|Array buffer|out of memory|OOM|WebAssembly/i.test(
-      technical,
-    )
-  ) {
-    return "The MP4 converter ran out of resources or stopped unexpectedly. Close extra heavy tabs and try again.";
-  }
-
-  if (/folder|download/i.test(technical)) {
-    return "Chrome could not save this file. Check that downloads are allowed, then try again.";
-  }
-
-  return "Try refreshing the video page, then start the download again.";
-}
-
 function setFailure(title: string, error: unknown): void {
   setStatus(title, userError(error));
 }
@@ -567,226 +485,12 @@ const downloadSubfolderReady = restoreDownloadSubfolder().catch((error) =>
 
 sweepStaleOpfsJobs(appState.activeOpfsJobDir).catch(() => {});
 
-function formatBytes(value: number): string {
-  if (!value) return "0 B";
-  const units = ["B", "KB", "MB", "GB"];
-
-  const index = Math.min(
-    Math.floor(Math.log(value) / Math.log(1024)),
-    units.length - 1,
-  );
-
-  return `${(value / 1024 ** index).toFixed(index ? 1 : 0)} ${units[index]}`;
-}
-
-function parseAttributes(source: string): Record<string, string> {
-  return parseHlsAttributes(source);
-}
-
-function resolveUri(value: string, baseUrl: string): string {
-  return new URL(value, baseUrl).href;
-}
-
 function isApiPlaylistSource(value: string): boolean {
   try {
     return /\/courses\//i.test(new URL(value).pathname);
   } catch {
     return false;
   }
-}
-
-function parseByteRange(value: string, previous: ByteRange | null): ByteRange {
-  const [lengthPart, offsetPart] = value.split("@");
-  const length = Number(lengthPart);
-
-  const offset =
-    offsetPart === undefined ? (previous?.end ?? 0) : Number(offsetPart);
-
-  if (!Number.isSafeInteger(length) || !Number.isSafeInteger(offset)) {
-    throw new Error(`Invalid byte range: ${value}`);
-  }
-
-  return {
-    start: offset,
-    end: offset + length,
-    header: `bytes=${offset}-${offset + length - 1}`,
-  };
-}
-
-function nextUri(
-  lines: readonly string[],
-  startingAt: number,
-): { readonly value: string; readonly index: number } {
-  const offset = lines.slice(startingAt).findIndex((raw) => {
-    const trimmed = raw.trim();
-
-    return Boolean(trimmed) && !trimmed.startsWith("#");
-  });
-
-  if (offset < 0) throw new Error("A manifest tag is missing its URI.");
-  const index = startingAt + offset;
-
-  return { value: lines[index].trim(), index };
-}
-
-function parseMasterQualityOptions(
-  lines: readonly string[],
-  baseUrl: string,
-): AnalyzedQualityOption[] {
-  const qualityOptions: AnalyzedQualityOption[] = [];
-
-  for (const [index, rawLine] of lines.entries()) {
-    const line = rawLine.trim();
-
-    if (!line.startsWith("#EXT-X-STREAM-INF:")) continue;
-    const attrs = parseAttributes(line.slice("#EXT-X-STREAM-INF:".length));
-    const next = nextUri(lines, index + 1);
-    const [width, height] = (attrs.RESOLUTION || "0x0").split("x").map(Number);
-
-    const candidate: AnalyzedQualityOption = {
-      uri: resolveUri(next.value, baseUrl),
-      label: height
-        ? `${height}p (${width}×${height})`
-        : `${Math.round(Number(attrs.BANDWIDTH || 0) / 1000)} kbps`,
-      bandwidth: Number(attrs.BANDWIDTH || 0),
-      codecs: attrs.CODECS || "unknown codec",
-    };
-
-    if (
-      !qualityOptions.some(
-        (existing) =>
-          qualityOptionKey(existing) === qualityOptionKey(candidate),
-      )
-    ) {
-      qualityOptions.push(candidate);
-    }
-  }
-
-  return qualityOptions;
-}
-
-interface MediaParseState {
-  map: MediaMap | null;
-  pendingRange: ByteRange | null;
-  previousRange: ByteRange | null;
-  pendingDiscontinuity: boolean;
-  totalDurationSeconds: number;
-  sequence: number;
-}
-
-function applyMediaLine(
-  line: string,
-  baseUrl: string,
-  mediaState: MediaParseState,
-  segments: MediaSegment[],
-): void {
-  if (line.startsWith("#EXT-X-KEY:")) {
-    const key = parseAttributes(line.slice("#EXT-X-KEY:".length));
-
-    if (key.METHOD && key.METHOD !== "NONE") {
-      throw new Error(`Encrypted manifest (${key.METHOD}) is not supported.`);
-    }
-
-    return;
-  }
-
-  if (line.startsWith("#EXT-X-MAP:")) {
-    const attrs = parseAttributes(line.slice("#EXT-X-MAP:".length));
-
-    mediaState.map = {
-      uri: resolveUri(attrs.URI, baseUrl),
-      range: attrs.BYTERANGE
-        ? parseByteRange(attrs.BYTERANGE, mediaState.previousRange)
-        : null,
-    };
-
-    return;
-  }
-
-  if (line.startsWith("#EXT-X-BYTERANGE:")) {
-    mediaState.pendingRange = parseByteRange(
-      line.slice("#EXT-X-BYTERANGE:".length),
-      mediaState.previousRange,
-    );
-
-    return;
-  }
-
-  if (line === "#EXT-X-DISCONTINUITY") {
-    mediaState.pendingDiscontinuity = true;
-
-    return;
-  }
-
-  if (line.startsWith("#EXTINF:")) {
-    const duration = Number.parseFloat(line.slice("#EXTINF:".length));
-
-    if (Number.isFinite(duration) && duration > 0) {
-      mediaState.totalDurationSeconds += duration;
-    }
-
-    return;
-  }
-
-  if (line.startsWith("#")) return;
-  mediaState.sequence += 1;
-
-  segments.push({
-    uri: resolveUri(line, baseUrl),
-    range: mediaState.pendingRange,
-    sequence: mediaState.sequence,
-    ...(mediaState.pendingDiscontinuity ? { discontinuity: true } : {}),
-  });
-
-  mediaState.previousRange = mediaState.pendingRange;
-  mediaState.pendingRange = null;
-  mediaState.pendingDiscontinuity = false;
-}
-
-function parsePlaylist(text: string, baseUrl: string): PlaylistAnalysis {
-  const lines = text.replace(/^\uFEFF/, "").split(/\r?\n/);
-
-  if (lines[0]?.trim() !== "#EXTM3U") {
-    throw new Error("The URL did not return an HLS manifest.");
-  }
-
-  const qualityOptions = parseMasterQualityOptions(lines, baseUrl);
-
-  if (qualityOptions.length) {
-    return {
-      type: "master",
-      qualityOptions: sortHlsQualityOptions(qualityOptions),
-    };
-  }
-
-  const segments: MediaSegment[] = [];
-
-  const mediaState: MediaParseState = {
-    map: null,
-    pendingRange: null,
-    previousRange: null,
-    pendingDiscontinuity: false,
-    totalDurationSeconds: 0,
-    sequence: 0,
-  };
-
-  for (const raw of lines) {
-    const line = raw.trim();
-
-    if (line) applyMediaLine(line, baseUrl, mediaState, segments);
-  }
-
-  if (!segments.length) {
-    throw new Error("No media segments were found in this playlist.");
-  }
-
-  return {
-    type: "media",
-    segments,
-    map: mediaState.map,
-    complete: lines.some((line) => line.trim() === "#EXT-X-ENDLIST"),
-    totalDurationSeconds: mediaState.totalDurationSeconds,
-  };
 }
 
 function fetchDirectMedia(

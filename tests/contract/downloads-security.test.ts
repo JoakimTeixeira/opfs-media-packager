@@ -69,7 +69,13 @@ test("should keep page-originated data behind a validated message and URL bounda
   assert.match(pageCourseProbe, /referrer: location\.href/);
   assert.match(pageCourseProbe, /referrerPolicy: "unsafe-url"/);
   assert.match(app, /safeMediaUrl\(segment\.uri\)/);
-  assert.match(app, /function userError/);
+
+  const downloadDisplay = await readFile(
+    new URL("src/download-display.ts", root),
+    "utf8",
+  );
+
+  assert.match(downloadDisplay, /function userError/);
   assert.doesNotMatch(app, /setStatus\("Download failed", error\.message\)/);
 
   assert.match(
