@@ -10,10 +10,18 @@ import {
   resolveSafeUrl,
   stringField,
 } from "./topic-asset-urls.ts";
-import type { TopicFileAsset } from "./topic-assets.ts";
-import type { DocumentCollector } from "./topic-asset-collector.ts";
+import type {
+  AttachedDocumentKind,
+  TopicCompanionDocuments,
+  TopicFileAsset,
+} from "./topic-assets.ts";
+import {
+  createDocumentCollector,
+  type DocumentCollector,
+} from "./topic-asset-collector.ts";
 
 const IMAGE_EXTENSION_PATTERN = /\.(?:png|jpe?g|webp|gif|bmp|avif)(?:$|[?#])/i;
+const FILE_EXTENSION_PATTERN = /\.[a-z0-9]{2,6}$/i;
 
 function isPdfAttachment(
   contentType: string,
@@ -134,6 +142,121 @@ function buildImageAsset(
   };
 }
 
+const ATTACHED_DOCUMENT_EXTENSION_KINDS: Readonly<
+  Record<string, AttachedDocumentKind>
+> = Object.freeze({
+  pptx: "pptx",
+  ppt: "pptx",
+  docx: "docx",
+  doc: "docx",
+  xlsx: "xlsx",
+  xls: "xlsx",
+  csv: "csv",
+  md: "md",
+  markdown: "md",
+  txt: "txt",
+  zip: "zip",
+  json: "json",
+});
+
+const ATTACHED_DOCUMENT_MIME_KINDS: Readonly<
+  Record<string, AttachedDocumentKind>
+> = Object.freeze({
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+    "pptx",
+  "application/vnd.ms-powerpoint": "pptx",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+    "docx",
+  "application/msword": "docx",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+  "application/vnd.ms-excel": "xlsx",
+  "text/csv": "csv",
+  "text/markdown": "md",
+  "text/plain": "txt",
+  "application/zip": "zip",
+  "application/x-zip-compressed": "zip",
+  "application/json": "json",
+});
+
+const VALID_ATTACHED_DOCUMENT_KINDS: ReadonlySet<string> = new Set([
+  "pptx",
+  "docx",
+  "xlsx",
+  "csv",
+  "md",
+  "txt",
+  "zip",
+  "json",
+  "document",
+]);
+
+export function isAttachedDocumentKind(
+  value: unknown,
+): value is AttachedDocumentKind {
+  return typeof value === "string" && VALID_ATTACHED_DOCUMENT_KINDS.has(value);
+}
+
+/**
+ * Infers a specific document format kind (`pptx`, `docx`, `xlsx`, `csv`, `md`,
+ * `txt`, `zip`, `json`) from a filename extension or MIME type.
+ */
+export function inferAttachedDocumentKind(
+  filename: string,
+  contentType: string,
+): AttachedDocumentKind {
+  const extensionMatch = /\.([a-z0-9]{2,8})$/i.exec(filename.trim());
+
+  if (extensionMatch) {
+    const kindByExtension =
+      ATTACHED_DOCUMENT_EXTENSION_KINDS[extensionMatch[1].toLowerCase()];
+
+    if (kindByExtension) return kindByExtension;
+  }
+
+  const mimeType = contentType.split(";")[0].trim().toLowerCase();
+
+  return ATTACHED_DOCUMENT_MIME_KINDS[mimeType] ?? "document";
+}
+
+function isDownloadableAttachedDocument(
+  contentType: string,
+  filename: string,
+  nodeType: string,
+): boolean {
+  if (contentType.startsWith("text/html")) return false;
+  if (FILE_EXTENSION_PATTERN.test(filename)) return true;
+  if (nodeType === "file") return true;
+
+  return Boolean(
+    contentType &&
+    !contentType.startsWith("video/") &&
+    !contentType.startsWith("audio/"),
+  );
+}
+
+function buildAttachedDocumentAsset(
+  entryUrl: string | null,
+  rawFilename: string,
+  contentType: string,
+): TopicFileAsset | null {
+  if (!entryUrl) return null;
+
+  const fallbackUrl = optionalFallbackUrl(entryUrl, [
+    activeStorageBlobUrl(entryUrl),
+  ]);
+
+  const filename = rawFilename || filenameFromUrl(entryUrl, "document.bin");
+  const kind = inferAttachedDocumentKind(filename, contentType);
+
+  return {
+    kind,
+    url: entryUrl,
+    ...(fallbackUrl ? { fallbackUrl } : {}),
+    filename,
+    ...(contentType ? { contentType } : {}),
+  };
+}
+
 function collectSingleAttachment(
   rawEntry: unknown,
   pageUrl: string,
@@ -185,6 +308,18 @@ function collectSingleAttachment(
     );
 
     if (image) collector.addImage(image, [entryUrl]);
+
+    return;
+  }
+
+  if (isDownloadableAttachedDocument(contentType, rawFilename, nodeType)) {
+    const documentAsset = buildAttachedDocumentAsset(
+      entryUrl,
+      rawFilename,
+      contentType,
+    );
+
+    if (documentAsset) collector.addFile(documentAsset);
   }
 }
 
@@ -199,4 +334,33 @@ export function collectAttachments(
   for (const rawEntry of entries) {
     collectSingleAttachment(rawEntry, pageUrl, collector, seenSignedIds);
   }
+}
+
+function attachmentEntriesFromPayload(payload: unknown): readonly unknown[] {
+  if (Array.isArray(payload)) return payload;
+
+  const record = externalRecord(payload);
+
+  return Array.isArray(record?.records) ? record.records : [];
+}
+
+/**
+ * Extracts attached file records from a paginated `/files` API response or
+ * bare attachment record array into `TopicCompanionDocuments`.
+ */
+export function extractTopicFileAttachments(
+  payload: unknown,
+  pageUrl: string,
+): TopicCompanionDocuments {
+  const collector = createDocumentCollector();
+  const seenSignedIds = new Set<string>();
+
+  collectAttachments(
+    attachmentEntriesFromPayload(payload),
+    pageUrl,
+    collector,
+    seenSignedIds,
+  );
+
+  return collector.build("");
 }

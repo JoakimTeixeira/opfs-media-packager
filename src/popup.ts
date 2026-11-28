@@ -1,5 +1,10 @@
 import type { TrackOutline } from "../lib/track/track-plan.ts";
 import {
+  countTopicCompanionDocuments,
+  summarizeTopicCompanionDocuments,
+  type TopicCompanionDocuments,
+} from "../lib/materials/topic-assets.ts";
+import {
   DEFAULT_OUTPUT_FORMAT,
   OUTPUT_FORMAT_OPTIONS,
   outputFormatOrDefault,
@@ -27,6 +32,7 @@ interface DetectedStream {
 interface PopupState {
   readonly streams?: readonly DetectedStream[];
   readonly subtitles?: readonly SubtitleTrackCandidate[];
+  readonly documents?: TopicCompanionDocuments | null;
   readonly trackOutline?: TrackOutline | null;
   readonly preferredOutput?: string;
   readonly preferredQualityLabel: string;
@@ -175,9 +181,17 @@ function render(state: PopupState): void {
 
     copy.className = "copy";
 
+    const documentSummary = summarizeTopicCompanionDocuments(state.documents);
+
     copy.append(
       node("div", stream.title, "title"),
-      node("div", "Detected stream", "host"),
+      node(
+        "div",
+        documentSummary.length
+          ? `Detected stream · ${documentSummary.join(" · ")}`
+          : "Detected stream",
+        "host",
+      ),
     );
 
     header.append(copy);
@@ -285,6 +299,9 @@ function render(state: PopupState): void {
             selectedLabel: qualityOption.label,
             qualityOptions,
             subtitle: track,
+            ...(countTopicCompanionDocuments(state.documents) > 0
+              ? { documents: state.documents }
+              : {}),
             outputFormat: output.value,
             autoStart: true,
           },

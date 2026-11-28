@@ -18,6 +18,7 @@ export interface DocumentCollector {
     extraAliases?: readonly (string | null)[],
   ) => void;
   readonly addPdf: (asset: TopicFileAsset) => void;
+  readonly addFile: (asset: TopicFileAsset) => void;
   readonly addLink: (rawUrl: string, title: string, pageUrl: string) => void;
   readonly build: (markdown: string) => TopicCompanionDocuments;
 }
@@ -25,10 +26,12 @@ export interface DocumentCollector {
 export function createDocumentCollector(): DocumentCollector {
   const images: TopicFileAsset[] = [];
   const pdfs: TopicFileAsset[] = [];
+  const files: TopicFileAsset[] = [];
   const diagrams: TopicLinkAsset[] = [];
   const slides: TopicLinkAsset[] = [];
   const seenImages = new Set<string>();
   const seenPdfs = new Set<string>();
+  const seenFiles = new Set<string>();
   const seenDiagrams = new Set<string>();
   const seenSlides = new Set<string>();
 
@@ -53,6 +56,13 @@ export function createDocumentCollector(): DocumentCollector {
 
     seenPdfs.add(asset.url);
     pdfs.push(Object.freeze(asset));
+  };
+
+  const addFile = (asset: TopicFileAsset): void => {
+    if (seenFiles.has(asset.url)) return;
+
+    seenFiles.add(asset.url);
+    files.push(Object.freeze(asset));
   };
 
   const addLink = (rawUrl: string, title: string, pageUrl: string): void => {
@@ -111,9 +121,10 @@ export function createDocumentCollector(): DocumentCollector {
       markdown,
       images: Object.freeze(images),
       pdfs: Object.freeze(pdfs),
+      ...(files.length ? { files: Object.freeze(files) } : {}),
       diagrams: Object.freeze(diagrams),
       slides: Object.freeze(slides),
     });
 
-  return { addImage, addPdf, addLink, build };
+  return { addImage, addPdf, addFile, addLink, build };
 }

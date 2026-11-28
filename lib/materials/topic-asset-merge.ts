@@ -75,10 +75,17 @@ function combineDocumentCollections(
   markdown: string,
   extraNotes: readonly TopicMarkdownNote[],
 ): TopicCompanionDocuments | undefined {
+  const files = mergeUniqueAssets(
+    base.files ?? [],
+    secondary.files ?? [],
+    "document",
+  );
+
   const merged: TopicCompanionDocuments = Object.freeze({
     markdown,
     images: mergeUniqueAssets(base.images, secondary.images, "image"),
     pdfs: mergeUniqueAssets(base.pdfs, secondary.pdfs, "pdf"),
+    ...(files.length ? { files } : {}),
     diagrams: mergeUniqueAssets(base.diagrams, secondary.diagrams, "diagram"),
     slides: mergeUniqueAssets(base.slides, secondary.slides, "slides"),
     ...(extraNotes.length ? { extraNotes } : {}),

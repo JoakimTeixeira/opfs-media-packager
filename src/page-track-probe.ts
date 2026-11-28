@@ -1,13 +1,17 @@
 // This main-world probe observes playlist content requests made by the signed-in
 // page and runs headless parallel probes on demand. It emits only media URLs,
 // never headers, cookies, tokens, or raw response payloads.
-import { normalizeTopicTitleKey } from "../lib/track/track-plan.ts";
+import {
+  normalizeTopicTitleKey,
+  trackRootFolderName,
+} from "../lib/track/track-plan.ts";
 import {
   countTopicCompanionDocuments,
   emptyTopicCompanionDocuments,
   extractFeaturedMediaEmbed,
   extractTopicCompanionDocumentsFromLinksAndHtml,
   extractTopicCompanionDocumentsFromRichText,
+  extractTopicFileAttachments,
   extractRichTextLinkedPostUrls,
   mergeTopicCompanionDocuments,
   withEmbeddedVideoMarkdown,
@@ -17,6 +21,7 @@ import {
   isSupplementaryLinkedPostUrl,
   scoreLinkedVideoUrl as scoreSharedLinkedVideoUrl,
 } from "../lib/materials/linked-video.ts";
+import { normalizeEmbedPlayerUrl } from "../lib/media/embed-player.ts";
 import { isDirectVideoUrl } from "../lib/media/stream-identity.ts";
 import { isStoryboardSubtitleUrl } from "../lib/subtitles/subtitle-tracks.ts";
 
@@ -38,6 +43,7 @@ interface ProbeSubtitleTrack {
 interface ProbedStream {
   readonly url: string;
   readonly mediaUrl: string;
+  readonly embedUrl?: string;
   readonly subtitles: readonly ProbeSubtitleTrack[];
   readonly linkedTitle?: string;
   readonly sourceUrl?: string;
@@ -72,6 +78,8 @@ interface GenericTopicTemplate {
 interface ObservedState {
   apiTrackTemplate: ApiTrackTemplate | null;
   genericTopicTemplate: GenericTopicTemplate | null;
+  spaceId: string;
+  publishedSpaceOutlineFingerprint: string;
   scannedDomProps: boolean;
   scannedPerformanceResources: boolean;
   defaultApiEndpointFailed: boolean;
@@ -236,12 +244,25 @@ interface PageMediaResponse {
   const observedState: ObservedState = {
     apiTrackTemplate: null,
     genericTopicTemplate: null,
+    spaceId: "",
+    publishedSpaceOutlineFingerprint: "",
     scannedDomProps: false,
     scannedPerformanceResources: false,
     defaultApiEndpointFailed: false,
   };
 
   const cachedStreamsById = new Map<string, ProbedStream>();
+
+  const cachedFileAttachmentsByTopicId = new Map<
+    string,
+    TopicCompanionDocuments
+  >();
+
+  const cachedTopicDocumentsByTopicId = new Map<
+    string,
+    TopicCompanionDocuments
+  >();
+
   const knownTopicsByTitle = new Map<string, KnownTopicEntry>();
   const knownTopicsBySectionAndTitle = new Map<string, KnownTopicEntry>();
   const knownTopicsById = new Map<string, KnownTopicEntry>();
@@ -1440,6 +1461,243 @@ interface PageMediaResponse {
     }
   }
 
+  function emitPageTopicDocuments(documents: TopicCompanionDocuments): void {
+    if (!countTopicCompanionDocuments(documents)) return;
+
+    window.postMessage(
+      {
+        source: "opfs-media-packager",
+        type: "page-topic-documents",
+        documents,
+      },
+      location.origin,
+    );
+  }
+
+  function buildSpaceSectionOutlineTopics(
+    slug: string,
+    rootFolder: string,
+    sections: readonly unknown[],
+  ): readonly {
+    readonly id: string;
+    readonly url: string;
+    readonly fileTitle: string;
+    readonly folderPath: readonly string[];
+  }[] {
+    const items: {
+      readonly id: string;
+      readonly url: string;
+      readonly fileTitle: string;
+      readonly folderPath: readonly string[];
+    }[] = [];
+
+    const seenIds = new Set<string>();
+    const sectionCounter = { number: 0 };
+
+    for (const rawSection of sections) {
+      const section = isObjectRecord(rawSection) ? rawSection : null;
+      const sectionId = validIdentifierString(section?.id);
+      const rawLessons = section?.lessons;
+
+      if (!section || !sectionId || !Array.isArray(rawLessons)) continue;
+
+      sectionCounter.number += 1;
+
+      const sectionTitle =
+        firstStringField(section, ["name", "title"]) ||
+        `Section ${sectionCounter.number}`;
+
+      const topicCounter = { number: 0 };
+
+      for (const rawLesson of rawLessons) {
+        const lesson = isObjectRecord(rawLesson) ? rawLesson : null;
+        const lessonId = validIdentifierString(lesson?.id);
+
+        if (!lesson || !lessonId || seenIds.has(lessonId)) continue;
+
+        seenIds.add(lessonId);
+        topicCounter.number += 1;
+
+        const lessonTitle =
+          firstStringField(lesson, ["name", "title"]) ||
+          `Item ${topicCounter.number}`;
+
+        const lessonUrl = new URL(
+          `/c/${encodeURIComponent(slug)}/sections/${encodeURIComponent(sectionId)}/lessons/${encodeURIComponent(lessonId)}`,
+          location.origin,
+        ).href;
+
+        items.push(
+          Object.freeze({
+            id: lessonId,
+            url: lessonUrl,
+            fileTitle: `${sectionCounter.number}.${topicCounter.number} ${lessonTitle}`,
+            folderPath: Object.freeze([
+              rootFolder,
+              `${sectionCounter.number}. ${sectionTitle}`,
+            ]),
+          }),
+        );
+      }
+    }
+
+    return Object.freeze(items);
+  }
+
+  function maybePublishSpaceOutline(parsed: unknown): void {
+    if (!isObjectRecord(parsed) || !Array.isArray(parsed.course_sections)) {
+      return;
+    }
+
+    const route = sidebarRoutePath.exec(location.pathname);
+    const spaceSlug = firstStringField(parsed, ["slug"]);
+
+    if (
+      !route ||
+      !spaceSlug ||
+      spaceSlug.toLowerCase() !== route[1].toLowerCase()
+    ) {
+      return;
+    }
+
+    const spaceId = validIdentifierString(parsed.id);
+
+    if (spaceId) observedState.spaceId = spaceId;
+
+    const trackTitle = firstStringField(parsed, ["name", "title"]) || spaceSlug;
+
+    const rootFolder = trackRootFolderName(trackTitle, location.href);
+
+    const items = buildSpaceSectionOutlineTopics(
+      route[1],
+      rootFolder,
+      parsed.course_sections,
+    );
+
+    if (!items.length) return;
+
+    const outline = Object.freeze({ title: trackTitle, items });
+    const fingerprint = JSON.stringify(outline);
+
+    if (fingerprint === observedState.publishedSpaceOutlineFingerprint) return;
+
+    observedState.publishedSpaceOutlineFingerprint = fingerprint;
+
+    window.postMessage(
+      {
+        source: "opfs-media-packager",
+        type: "track-outline",
+        outline,
+      },
+      location.origin,
+    );
+  }
+
+  function observeSpaceAndFilesMetadata(
+    resolved: URL | null,
+    parsed: unknown,
+    currentTopicId: string,
+  ): void {
+    maybePublishSpaceOutline(parsed);
+
+    if (!resolved) return;
+
+    const courseSpaceMatch = /\/internal_api\/courses\/(\d+)\//i.exec(
+      resolved.pathname,
+    );
+
+    if (courseSpaceMatch) observedState.spaceId = courseSpaceMatch[1];
+
+    const filesMatch =
+      /\/internal_api\/courses\/(\d+)\/lessons\/(\d+)\/files\b/i.exec(
+        resolved.pathname,
+      );
+
+    if (!filesMatch) return;
+
+    const fileTopicId = filesMatch[2];
+    const extracted = extractTopicFileAttachments(parsed, location.href);
+
+    if (!countTopicCompanionDocuments(extracted)) return;
+
+    const mergedFiles = mergeTopicCompanionDocuments(
+      cachedFileAttachmentsByTopicId.get(fileTopicId),
+      extracted,
+    );
+
+    if (!mergedFiles) return;
+
+    cachedFileAttachmentsByTopicId.set(fileTopicId, mergedFiles);
+
+    if (fileTopicId !== currentTopicId) return;
+
+    const combined = mergeTopicCompanionDocuments(
+      cachedTopicDocumentsByTopicId.get(currentTopicId),
+      mergedFiles,
+    );
+
+    if (combined) emitPageTopicDocuments(combined);
+  }
+
+  function observeCurrentGenericTopic(
+    resolved: URL,
+    parsed: unknown,
+    currentTopicId: string,
+    currentSectionId: string,
+    headers: Readonly<Record<string, string>>,
+    withCredentials: boolean,
+  ): void {
+    const media = extractMediaFromJson(parsed);
+    const embeddedVideo = extractFeaturedMediaEmbed(parsed, location.href);
+
+    const embedUrl = embeddedVideo
+      ? normalizeEmbedPlayerUrl(embeddedVideo.url)
+      : null;
+
+    if (!media.mediaUrl && !embedUrl && !looksLikeGenericTopicPayload(parsed)) {
+      return;
+    }
+
+    observedState.genericTopicTemplate = Object.freeze({
+      url: resolved.href,
+      topicId: currentTopicId,
+      sectionId:
+        currentSectionId && resolved.href.includes(currentSectionId)
+          ? currentSectionId
+          : "",
+      headers: Object.freeze({ ...headers }),
+      withCredentials,
+    });
+
+    const cachedTitle = knownTopicsById.get(currentTopicId)?.title || "";
+
+    const combinedDocuments =
+      mergeTopicCompanionDocuments(
+        extractDocumentsFromPayload(parsed, cachedTitle, location.href),
+        cachedFileAttachmentsByTopicId.get(currentTopicId),
+      ) ?? null;
+
+    if (combinedDocuments) {
+      cachedTopicDocumentsByTopicId.set(currentTopicId, combinedDocuments);
+      emitPageTopicDocuments(combinedDocuments);
+    }
+
+    if (media.mediaUrl) {
+      cacheExtractedStream(
+        currentTopicId,
+        media,
+        combinedDocuments,
+        collectSupplementaryLinkedPostUrls(parsed, location.href),
+      );
+
+      return;
+    }
+
+    if (embedUrl) {
+      emitCurrentTrackStream({ url: "", mediaUrl: "", embedUrl });
+    }
+  }
+
   function inspectGenericJsonResponse(
     requestUrl: string,
     text: string,
@@ -1455,6 +1713,12 @@ interface PageMediaResponse {
     if (!parsed) return;
     extractTopicsFromJson(parsed);
     const resolved = tryParseUrl(requestUrl);
+    const route = sidebarRoutePath.exec(location.pathname);
+    const queryTopicId = new URLSearchParams(location.search).get("conteudo");
+    const currentSectionId = route?.[2] || "";
+    const currentTopicId = route?.[3] || queryTopicId || "";
+
+    observeSpaceAndFilesMetadata(resolved, parsed, currentTopicId);
 
     if (
       resolved &&
@@ -1465,14 +1729,13 @@ interface PageMediaResponse {
       emitObservedMediaTracks(extractMediaFromJson(parsed));
     }
 
-    const route = sidebarRoutePath.exec(location.pathname);
-    const queryTopicId = new URLSearchParams(location.search).get("conteudo");
-    const currentSectionId = route?.[2] || "";
-    const currentTopicId = route?.[3] || queryTopicId || "";
-
-    if (!currentTopicId) return;
-
-    if (!resolved || !resolved.href.includes(currentTopicId)) return;
+    if (
+      !currentTopicId ||
+      !resolved ||
+      !resolved.href.includes(currentTopicId)
+    ) {
+      return;
+    }
 
     if (isObjectRecord(parsed) && typeof parsed.content === "string") {
       decodeApiTrackEnvelope(text, currentTopicId)
@@ -1493,30 +1756,13 @@ interface PageMediaResponse {
       return;
     }
 
-    const media = extractMediaFromJson(parsed);
-
-    if (!media.mediaUrl && !looksLikeGenericTopicPayload(parsed)) return;
-
-    observedState.genericTopicTemplate = Object.freeze({
-      url: resolved.href,
-      topicId: currentTopicId,
-      sectionId:
-        currentSectionId && resolved.href.includes(currentSectionId)
-          ? currentSectionId
-          : "",
-      headers: Object.freeze({ ...headers }),
-      withCredentials,
-    });
-
-    if (!media.mediaUrl) return;
-
-    const cachedTitle = knownTopicsById.get(currentTopicId)?.title || "";
-
-    cacheExtractedStream(
+    observeCurrentGenericTopic(
+      resolved,
+      parsed,
       currentTopicId,
-      media,
-      extractDocumentsFromPayload(parsed, cachedTitle, location.href),
-      collectSupplementaryLinkedPostUrls(parsed, location.href),
+      currentSectionId,
+      headers,
+      withCredentials,
     );
   }
 
@@ -1595,15 +1841,19 @@ interface PageMediaResponse {
   }
 
   function emitCurrentTrackStream(
-    stream: Pick<ProbedStream, "url" | "mediaUrl">,
+    stream: Pick<ProbedStream, "url" | "mediaUrl" | "embedUrl">,
   ): void {
-    if (!stream.url && !stream.mediaUrl) return;
+    if (!stream.url && !stream.mediaUrl && !stream.embedUrl) return;
 
     window.postMessage(
       {
         source: "opfs-media-packager",
         type: "track-stream",
-        stream: { url: stream.url, mediaUrl: stream.mediaUrl },
+        stream: {
+          url: stream.url,
+          mediaUrl: stream.mediaUrl,
+          ...(stream.embedUrl ? { embedUrl: stream.embedUrl } : {}),
+        },
       },
       location.origin,
     );
@@ -2025,6 +2275,178 @@ interface PageMediaResponse {
     return documents ? documentsOnlyStream(fallbackPageUrl, documents) : null;
   }
 
+  async function fetchTopicFilesPage(
+    spaceId: string,
+    topicId: string,
+    page: number,
+    fallbackPageUrl: string,
+    template: GenericTopicTemplate,
+  ): Promise<{
+    readonly documents: TopicCompanionDocuments | null;
+    readonly hasMore: boolean;
+    readonly rateLimited: boolean;
+  }> {
+    const filesUrl = new URL(
+      `/internal_api/courses/${encodeURIComponent(spaceId)}/lessons/${encodeURIComponent(topicId)}/files?per_page=20&page=${page}`,
+      location.origin,
+    ).href;
+
+    const outcome = await fetchOriginResponseWithBackoff(filesUrl, {
+      cache: "no-store",
+      credentials: template.withCredentials ? "include" : "omit",
+      headers: template.headers,
+    });
+
+    if (outcome.rateLimited) {
+      return { documents: null, hasMore: false, rateLimited: true };
+    }
+
+    if (!outcome.response) {
+      return { documents: null, hasMore: false, rateLimited: false };
+    }
+
+    const parsed = tryParseJson(await outcome.response.text().catch(() => ""));
+
+    if (!parsed) {
+      return { documents: null, hasMore: false, rateLimited: false };
+    }
+
+    const extracted = extractTopicFileAttachments(parsed, fallbackPageUrl);
+
+    return {
+      documents: countTopicCompanionDocuments(extracted) > 0 ? extracted : null,
+      hasMore: isObjectRecord(parsed) && parsed.has_next_page === true,
+      rateLimited: false,
+    };
+  }
+
+  async function fetchTopicFileAttachments(
+    topicId: string,
+    fallbackPageUrl: string,
+    template: GenericTopicTemplate,
+  ): Promise<{
+    readonly documents: TopicCompanionDocuments | null;
+    readonly rateLimited: boolean;
+  }> {
+    const cached = cachedFileAttachmentsByTopicId.get(topicId);
+
+    if (cached) return { documents: cached, rateLimited: false };
+
+    const templateSpaceMatch = /\/internal_api\/courses\/(\d+)\//i.exec(
+      template.url,
+    );
+
+    const spaceId = observedState.spaceId || templateSpaceMatch?.[1] || "";
+
+    if (!spaceId || !/^\d+$/.test(topicId)) {
+      return { documents: null, rateLimited: false };
+    }
+
+    const pageState: {
+      page: number;
+      hasMore: boolean;
+      merged: TopicCompanionDocuments | undefined;
+    } = { page: 1, hasMore: true, merged: undefined };
+
+    while (pageState.hasMore && pageState.page <= 5) {
+      const pageResult = await fetchTopicFilesPage(
+        spaceId,
+        topicId,
+        pageState.page,
+        fallbackPageUrl,
+        template,
+      );
+
+      if (pageResult.rateLimited) return { documents: null, rateLimited: true };
+
+      if (pageResult.documents) {
+        pageState.merged = mergeTopicCompanionDocuments(
+          pageState.merged,
+          pageResult.documents,
+        );
+      }
+
+      pageState.hasMore = pageResult.hasMore;
+      pageState.page += 1;
+    }
+
+    if (pageState.merged) {
+      cachedFileAttachmentsByTopicId.set(topicId, pageState.merged);
+    }
+
+    return { documents: pageState.merged ?? null, rateLimited: false };
+  }
+
+  function resolveEmbedTopicProbeResult(
+    topicId: string,
+    payload: unknown,
+    media: ExtractedMedia,
+    documents: TopicCompanionDocuments | null,
+    fallbackPageUrl: string,
+  ): HeadlessProbeResult | null {
+    const embeddedVideo = extractFeaturedMediaEmbed(payload, fallbackPageUrl);
+
+    const embedUrl = embeddedVideo
+      ? normalizeEmbedPlayerUrl(embeddedVideo.url)
+      : null;
+
+    if (!embedUrl) return null;
+
+    const stream: ProbedStream = Object.freeze({
+      url: "",
+      mediaUrl: "",
+      embedUrl,
+      subtitles: media.subtitles,
+      sourceUrl: fallbackPageUrl,
+      ...(documents ? { documents } : {}),
+    });
+
+    cachedStreamsById.set(topicId, stream);
+
+    return Object.freeze({ checked: true, stream, linkedUrl: "" });
+  }
+
+  async function resolveLinkedUrlsProbeResult(
+    topicId: string,
+    linkedUrls: readonly string[],
+    documents: TopicCompanionDocuments | null,
+    fallbackPageUrl: string,
+  ): Promise<HeadlessProbeResult | null> {
+    if (linkedUrls.length > 1) {
+      return Object.freeze({
+        checked: false,
+        stream: optionalDocumentsStream(fallbackPageUrl, documents),
+        linkedUrl: linkedUrls[0],
+        linkedUrls: Object.freeze(linkedUrls),
+      });
+    }
+
+    if (linkedUrls.length !== 1) return null;
+
+    const linked = await resolveLinkedVideoHeadless(linkedUrls);
+
+    if (linked.rateLimited) return RATE_LIMITED_PROBE_RESULT;
+
+    if (linked.stream) {
+      const stream = mergeLinkedStreamDocuments(documents, linked.stream);
+
+      cachedStreamsById.set(topicId, stream);
+
+      return Object.freeze({ checked: true, stream, linkedUrl: "" });
+    }
+
+    if (linked.fallbackUrl) {
+      return Object.freeze({
+        checked: false,
+        stream: optionalDocumentsStream(fallbackPageUrl, documents),
+        linkedUrl: linked.fallbackUrl,
+        linkedUrls: Object.freeze([linked.fallbackUrl]),
+      });
+    }
+
+    return null;
+  }
+
   async function probeViaGenericTopicApi(
     topicId: string,
     sectionId: string,
@@ -2045,11 +2467,23 @@ interface PageMediaResponse {
     if (!fetched.payload) return null;
     const media = extractMediaFromJson(fetched.payload);
 
-    const documents = extractDocumentsFromPayload(
-      fetched.payload,
-      topicTitle,
+    const filesOutcome = await fetchTopicFileAttachments(
+      topicId,
       fallbackPageUrl,
+      template,
     );
+
+    if (filesOutcome.rateLimited) return RATE_LIMITED_PROBE_RESULT;
+
+    const documents =
+      mergeTopicCompanionDocuments(
+        extractDocumentsFromPayload(
+          fetched.payload,
+          topicTitle,
+          fallbackPageUrl,
+        ),
+        filesOutcome.documents,
+      ) ?? null;
 
     if (media.mediaUrl) {
       const supplementaryLinks = collectSupplementaryLinkedPostUrls(
@@ -2076,42 +2510,24 @@ interface PageMediaResponse {
       return Object.freeze({ checked: true, stream, linkedUrl: "" });
     }
 
-    const linkedUrls = collectPayloadLinkedUrls(
+    const embedResult = resolveEmbedTopicProbeResult(
+      topicId,
       fetched.payload,
+      media,
+      documents,
       fallbackPageUrl,
     );
 
-    if (linkedUrls.length > 1) {
-      return Object.freeze({
-        checked: false,
-        stream: optionalDocumentsStream(fallbackPageUrl, documents),
-        linkedUrl: linkedUrls[0],
-        linkedUrls: Object.freeze(linkedUrls),
-      });
-    }
+    if (embedResult) return embedResult;
 
-    if (linkedUrls.length === 1) {
-      const linked = await resolveLinkedVideoHeadless(linkedUrls);
+    const linkedResult = await resolveLinkedUrlsProbeResult(
+      topicId,
+      collectPayloadLinkedUrls(fetched.payload, fallbackPageUrl),
+      documents,
+      fallbackPageUrl,
+    );
 
-      if (linked.rateLimited) return RATE_LIMITED_PROBE_RESULT;
-
-      if (linked.stream) {
-        const stream = mergeLinkedStreamDocuments(documents, linked.stream);
-
-        cachedStreamsById.set(topicId, stream);
-
-        return Object.freeze({ checked: true, stream, linkedUrl: "" });
-      }
-
-      if (linked.fallbackUrl) {
-        return Object.freeze({
-          checked: false,
-          stream: optionalDocumentsStream(fallbackPageUrl, documents),
-          linkedUrl: linked.fallbackUrl,
-          linkedUrls: Object.freeze([linked.fallbackUrl]),
-        });
-      }
-    }
+    if (linkedResult) return linkedResult;
 
     if (documents) {
       const stream = documentsOnlyStream(fallbackPageUrl, documents);
@@ -2221,7 +2637,10 @@ interface PageMediaResponse {
 
     return Object.freeze({
       checked: true,
-      stream: cached.url || cached.mediaUrl || cached.documents ? cached : null,
+      stream:
+        cached.url || cached.mediaUrl || cached.embedUrl || cached.documents
+          ? cached
+          : null,
       linkedUrl: "",
     });
   }

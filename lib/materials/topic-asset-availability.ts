@@ -1,5 +1,8 @@
 import type { TrackDownloadMode } from "../downloads/download-preferences.ts";
-import type { TopicCompanionDocuments } from "./topic-assets.ts";
+import type {
+  TopicCompanionDocuments,
+  TopicFileAsset,
+} from "./topic-assets.ts";
 
 /**
  * Returns the total count of extracted documents for a item.
@@ -14,6 +17,7 @@ export function countTopicCompanionDocuments(
     (documents.extraNotes?.length ?? 0) +
     documents.images.length +
     documents.pdfs.length +
+    (documents.files?.length ?? 0) +
     documents.diagrams.length +
     documents.slides.length
   );
@@ -29,6 +33,36 @@ function pluralBadge(
   return [`${count} ${count === 1 ? singular : plural}`];
 }
 
+const SPECIFIC_DOCUMENT_BADGES: Readonly<Record<string, string>> =
+  Object.freeze({
+    pptx: "PPTX",
+    docx: "DOCX",
+    xlsx: "XLSX",
+    csv: "CSV",
+    md: "MD",
+    txt: "TXT",
+    zip: "ZIP",
+    json: "JSON",
+  });
+
+function summarizeAttachedFiles(
+  files: readonly TopicFileAsset[] | undefined,
+): readonly string[] {
+  if (!files?.length) return [];
+
+  const counts = new Map<string, number>();
+
+  for (const asset of files) {
+    counts.set(asset.kind, (counts.get(asset.kind) ?? 0) + 1);
+  }
+
+  return [...counts.entries()].flatMap(([kind, count]) => {
+    const label = SPECIFIC_DOCUMENT_BADGES[kind];
+
+    return label ? [`${count} ${label}`] : pluralBadge(count, "document");
+  });
+}
+
 /**
  * Returns concise human-readable summary badges for a item's documents.
  */
@@ -40,6 +74,7 @@ export function summarizeTopicCompanionDocuments(
   return [
     ...(documents.markdown || documents.extraNotes?.length ? ["MD"] : []),
     ...pluralBadge(documents.pdfs.length, "PDF"),
+    ...summarizeAttachedFiles(documents.files),
     ...pluralBadge(documents.images.length, "image"),
     ...pluralBadge(documents.diagrams.length, "diagram"),
     ...pluralBadge(documents.slides.length, "slides", "slides"),

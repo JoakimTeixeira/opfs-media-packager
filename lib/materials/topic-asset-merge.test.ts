@@ -24,4 +24,34 @@ test("should return no materials for empty input", () => {
   expect(
     mergeTopicCompanionDocuments(emptyTopicCompanionDocuments(), null),
   ).toBeUndefined();
+
+  const withFiles = mergeTopicCompanionDocuments(
+    {
+      ...emptyTopicCompanionDocuments(),
+      files: [
+        {
+          kind: "pptx",
+          url: "https://assets.example.net/token-1",
+          filename: "Deck.pptx",
+        },
+      ],
+    },
+    {
+      ...emptyTopicCompanionDocuments(),
+      files: [
+        {
+          kind: "pptx",
+          url: "https://assets.example.net/token-1/",
+          filename: "Deck.pptx",
+        },
+        {
+          kind: "docx",
+          url: "https://assets.example.net/token-2",
+          filename: "Guide.docx",
+        },
+      ],
+    },
+  );
+
+  expect(withFiles?.files).toHaveLength(2);
 });

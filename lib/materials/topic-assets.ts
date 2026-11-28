@@ -17,6 +17,12 @@ export {
   extractRichTextLinkedPostUrls,
 } from "./topic-rich-text-links.ts";
 import { collectAttachments } from "./topic-asset-attachments.ts";
+
+export {
+  extractTopicFileAttachments,
+  inferAttachedDocumentKind,
+  isAttachedDocumentKind,
+} from "./topic-asset-attachments.ts";
 import {
   createDocumentCollector,
   type DocumentCollector,
@@ -54,8 +60,13 @@ export {
   summarizeTopicCompanionDocuments,
   isTopicDownloadableForMode,
 } from "./topic-asset-availability.ts";
+export type AttachedDocumentKind =
+  "pptx" | "docx" | "xlsx" | "csv" | "md" | "txt" | "zip" | "json" | "document";
+
+export type TopicFileAssetKind = "image" | "pdf" | AttachedDocumentKind;
+
 export interface TopicFileAsset {
-  readonly kind: "image" | "pdf";
+  readonly kind: TopicFileAssetKind;
   readonly url: string;
   readonly fallbackUrl?: string;
   readonly filename: string;
@@ -83,6 +94,7 @@ export interface TopicCompanionDocuments {
   readonly markdown: string;
   readonly images: readonly TopicFileAsset[];
   readonly pdfs: readonly TopicFileAsset[];
+  readonly files?: readonly TopicFileAsset[];
   readonly diagrams: readonly TopicLinkAsset[];
   readonly slides: readonly TopicLinkAsset[];
   readonly extraNotes?: readonly TopicMarkdownNote[];
@@ -328,6 +340,11 @@ export function extractTopicCompanionDocumentsFromLinksAndHtml(input: {
     readonly alt?: string;
     readonly filename?: string;
   }[];
+  readonly files?: readonly {
+    readonly url: string;
+    readonly filename?: string;
+    readonly contentType?: string;
+  }[];
   readonly links?: readonly { readonly url: string; readonly text?: string }[];
   readonly embeddedVideo?: EmbeddedVideoLink | null;
 }): TopicCompanionDocuments {
@@ -336,6 +353,13 @@ export function extractTopicCompanionDocumentsFromLinksAndHtml(input: {
   for (const image of input.images ?? []) {
     collectDomImage(image, input.pageUrl, collector);
   }
+
+  collectAttachments(
+    input.files ?? [],
+    input.pageUrl,
+    collector,
+    new Set<string>(),
+  );
 
   for (const link of input.links ?? []) {
     collector.addLink(link.url, link.text ?? "", input.pageUrl);

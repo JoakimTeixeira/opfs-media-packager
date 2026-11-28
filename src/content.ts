@@ -15,6 +15,7 @@ import {
   type TopicCompanionDocuments,
 } from "../lib/materials/topic-assets.ts";
 import { scoreLinkedVideoUrl } from "../lib/materials/linked-video.ts";
+import { normalizeEmbedPlayerUrl } from "../lib/media/embed-player.ts";
 import { isDirectVideoUrl } from "../lib/media/stream-identity.ts";
 import {
   isStoryboardSubtitleUrl,
@@ -98,6 +99,8 @@ interface WindowBridgeMessage {
   readonly unresolvedLinkLists?: unknown;
   readonly tracks?: unknown;
   readonly rateLimited?: unknown;
+  readonly outline?: unknown;
+  readonly documents?: unknown;
 }
 
 type RuntimeMessageHandler = (
@@ -108,6 +111,7 @@ type RuntimeMessageHandler = (
 // Detect subtitle tracks that the player declares in its DOM before the viewer
 // opens the CC menu. This also runs inside player iframes.
 const sentTracks = new Set<string>();
+const sentEmbedUrls = new Set<string>();
 
 const contentState = {
   lastOutlineFingerprint: "",
@@ -325,6 +329,7 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
       }
 
       reportTracks(true);
+      reportEmbedPlayerIframes(true);
 
       Promise.resolve(reportTrackOutline(true)).finally(() =>
         sendResponse({ ok: true }),
@@ -486,6 +491,22 @@ const windowMessageHandlers: Readonly<
       .sendMessage({ type: "page-subtitle-tracks", tracks: data.tracks })
       .catch(() => {});
   },
+  "track-outline"(data) {
+    if (!isTrackOutlinePayload(data.outline)) return;
+
+    publishTrackOutline(data.outline, true);
+  },
+  "page-topic-documents"(data) {
+    if (!isObjectRecord(data.documents)) return;
+
+    chrome.runtime
+      .sendMessage({
+        type: "page-topic-documents",
+        documents: data.documents,
+        sourceUrl: location.href,
+      })
+      .catch(() => {});
+  },
 });
 
 window.addEventListener("message", (event: MessageEvent<unknown>) => {
@@ -551,13 +572,13 @@ function topicUrl(item: Element, currentUrl: URL): string {
 }
 
 const TOPIC_BADGE_PATTERN =
-  /^(?:aula|lesson|v[ií]deo|video|sess[aã]o|session|epis[oó]dio|episode|cap[ií]tulo|chapter|encontro|workshop|palestra|talk|live|conte[uú]do|content|conclu[ií]d[oa]s?|completed|em\s+andamento|in\s+progress)$/i;
+  /^(?:aula|lesson|t[oó]pico|topic|teste|quiz|v[ií]deo|video|sess[aã]o|session|epis[oó]dio|episode|cap[ií]tulo|chapter|encontro|workshop|palestra|talk|live|conte[uú]do|content|conclu[ií]d[oa]s?|completed|em\s+andamento|in\s+progress)$/i;
 
 const TOPIC_BADGE_SUFFIX_PATTERN =
-  /\b(?:aula|item|v[ií]deo|video|sess[aã]o|session|epis[oó]dio|episode|cap[ií]tulo|chapter|encontro|workshop|palestra|talk|live|conclu[ií]d[oa]s?|completed)\s*$/i;
+  /\b(?:aula|item|t[oó]pico|topic|teste|quiz|v[ií]deo|video|sess[aã]o|session|epis[oó]dio|episode|cap[ií]tulo|chapter|encontro|workshop|palestra|talk|live|conclu[ií]d[oa]s?|completed)\s*$/i;
 
 const SECTION_COUNT_PATTERN =
-  /^\d+\s+(?:aulas?|lessons?|sess[oõ]es?|sess[aã]o|sessions?|v[ií]deos?|videos?|epis[oó]dios?|episodes?|cap[ií]tulos?|chapters?|encontros?|workshops?|palestras?|talks?|lives?|m[oó]dulos?|modules?|itens?|items?)$/i;
+  /^\d+\s+(?:aulas?|lessons?|t[oó]picos?|topics?|sess[oõ]es?|sess[aã]o|sessions?|v[ií]deos?|videos?|epis[oó]dios?|episodes?|cap[ií]tulos?|chapters?|encontros?|workshops?|palestras?|talks?|lives?|m[oó]dulos?|modules?|itens?|items?)$/i;
 
 const ACTION_BUTTON_PATTERN =
   /^(?:concluir|conclu[ií]d[oa]s?|completed|marcar|desmarcar|completar|finalizar|próxim[oa]|anterior|voltar|fechar|abrir|recolher|expandir)\b/i;
@@ -618,12 +639,14 @@ function elementTextLines(element: Element): string[] {
 function topicTitle(item: Element): string {
   const lines = elementTextLines(item);
 
+  const nonDurationLines = lines.filter(
+    (line) => !/^\d{1,2}:\d{2}(?::\d{2})?$/.test(line),
+  );
+
   const title =
-    lines.find(
-      (line) =>
-        !/^\d{1,2}:\d{2}(?::\d{2})?$/.test(line) &&
-        !TOPIC_BADGE_PATTERN.test(line),
-    ) || "Topic";
+    nonDurationLines.find((line) => !TOPIC_BADGE_PATTERN.test(line)) ||
+    nonDurationLines[0] ||
+    "Topic";
 
   // A duration can share a line with the title when the page uses inline text.
   return (
@@ -754,6 +777,7 @@ function serializedSidebarTopicUrls(current: URL): string[] {
 
 function resetSubtitleTrackingForNavigation(): void {
   sentTracks.clear();
+  sentEmbedUrls.clear();
 
   contentState.resourceScanFloor =
     typeof performance?.getEntriesByType === "function"
@@ -1123,6 +1147,41 @@ function collectDomTopicIframes(
   return holder.embeddedVideo;
 }
 
+interface DomTopicFileInput {
+  readonly url: string;
+  readonly filename?: string;
+}
+
+function collectDomDownloadAttachments(
+  root: Element,
+  commentsBoundary: Element | null,
+): DomTopicFileInput[] {
+  const seen = new Set<string>();
+  const files: DomTopicFileInput[] = [];
+
+  for (const anchor of root.querySelectorAll("a[href][download]")) {
+    if (isOutsideTopicBody(anchor, commentsBoundary)) continue;
+
+    const url = resolveDomElementUrl(anchor.getAttribute("href") || "");
+
+    if (!url || seen.has(url)) continue;
+
+    seen.add(url);
+
+    const downloadAttr = (anchor.getAttribute("download") || "").trim();
+
+    const textName =
+      cleanText(anchor.querySelector(".truncate")?.textContent || "") ||
+      cleanText(anchor.textContent || "");
+
+    const filename = downloadAttr || textName || filenameFromUrlPath(url);
+
+    files.push({ url, ...(filename ? { filename } : {}) });
+  }
+
+  return files;
+}
+
 function extractTopicCompanionDocumentsFromDom(): TopicCompanionDocuments | null {
   const editorRoot = document.querySelector(
     '[data-testid="tip-tap-editor-content"] [data-circle="rich-text-content"], [data-testid="tip-tap-editor-content"], [data-circle="event-body"], [data-testid="post-body"], article .ProseMirror, main .ProseMirror, main .trix-content, article .trix-content',
@@ -1138,6 +1197,11 @@ function extractTopicCompanionDocumentsFromDom(): TopicCompanionDocuments | null
   const images = editorRoot
     ? collectDomTopicImages(editorRoot, commentsBoundary)
     : [];
+
+  const files = collectDomDownloadAttachments(
+    mainRoot || primaryRoot,
+    commentsBoundary,
+  );
 
   const links: DomTopicLinkInput[] = [];
 
@@ -1158,13 +1222,16 @@ function extractTopicCompanionDocumentsFromDom(): TopicCompanionDocuments | null
     links,
   );
 
-  if (!editorRoot && !embeddedVideo && !links.length) return null;
+  if (!editorRoot && !embeddedVideo && !links.length && !files.length) {
+    return null;
+  }
 
   const documents = extractTopicCompanionDocumentsFromLinksAndHtml({
     title: currentPageHeading(),
     pageUrl: location.href,
     html: editorRoot ? editorRoot.innerHTML : "",
     images,
+    files,
     links,
     embeddedVideo,
   });
@@ -1592,7 +1659,7 @@ function isSectionHeadingText(value: string): boolean {
  * buttons, such as "Concluir aula", which would otherwise become part of it.
  */
 function sidebarTrackTitle(): string {
-  const header = document.querySelector("header");
+  const header = document.querySelector("header, [role=banner]");
 
   if (header) {
     const copy = header.cloneNode(true);
@@ -2203,6 +2270,39 @@ if (currentHiddenSlidesToken) {
     .catch(() => {});
 }
 
+function reportEmbedPlayerIframes(force = false): void {
+  if (currentHiddenOutlineId || window !== window.top) return;
+
+  const root = document.querySelector("main, [role=main]") || document.body;
+
+  if (!root) return;
+
+  const commentsBoundary = findTopicCommentsBoundary(root);
+
+  for (const iframe of root.querySelectorAll("iframe[src]")) {
+    if (isOutsideTopicBody(iframe, commentsBoundary)) continue;
+
+    const src = resolveDomElementUrl(iframe.getAttribute("src") || "");
+    const embedUrl = normalizeEmbedPlayerUrl(src);
+
+    if (!embedUrl || (!force && sentEmbedUrls.has(embedUrl))) continue;
+
+    sentEmbedUrls.add(embedUrl);
+
+    chrome.runtime
+      .sendMessage({
+        type: "page-track-stream",
+        stream: {
+          url: "",
+          mediaUrl: "",
+          embedUrl,
+          sourceUrl: location.href,
+        },
+      })
+      .catch(() => {});
+  }
+}
+
 if (
   !currentHiddenOutlineId &&
   !currentHiddenDiagramToken &&
@@ -2210,11 +2310,13 @@ if (
 ) {
   reportPageLocation();
   reportTracks();
+  reportEmbedPlayerIframes();
   reportTrackOutline();
 
   new MutationObserver(() => {
     reportPageLocation();
     reportTracks();
+    reportEmbedPlayerIframes();
     reportTrackOutline();
   }).observe(document.documentElement || document, {
     childList: true,

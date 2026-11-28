@@ -164,6 +164,7 @@ interface HandoffDownloadRequest {
   readonly outputFormat?: string;
   readonly autoStart?: boolean;
   readonly subtitle?: KnownSubtitleTrack | null;
+  readonly documents?: TopicCompanionDocuments | null;
 }
 
 function requireElement<T extends HTMLElement>(selector: string): T {
@@ -244,6 +245,7 @@ const appState: {
   downloadSubfolder: string;
   keepAliveDepth: number;
   activeOpfsJobDir: string | null;
+  singleDownloadDocuments: TopicCompanionDocuments | null;
 } = {
   playlistAnalysis: null,
   controller: null,
@@ -264,6 +266,7 @@ const appState: {
   downloadSubfolder: DEFAULT_DOWNLOAD_SUBFOLDER,
   keepAliveDepth: 0,
   activeOpfsJobDir: null,
+  singleDownloadDocuments: null,
 };
 
 const runStateKey = "lastDownloadRun";
@@ -690,11 +693,12 @@ function suppliedQualityChoices(
 ): MasterPlaylistAnalysis {
   return {
     type: "master",
-    qualityOptions: qualityOptions.map(({ url, label }) => ({
+    qualityOptions: qualityOptions.map(({ url, label, audioUri }) => ({
       uri: url,
       label,
       bandwidth: 0,
       codecs: "",
+      ...(audioUri ? { audioUri } : {}),
     })),
   };
 }
@@ -1079,6 +1083,7 @@ interface OpfsWorkspace {
 
 interface RemuxJobOptions {
   readonly media: MediaPlaylistAnalysis;
+  readonly audioMedia?: MediaPlaylistAnalysis | null;
   readonly mediaPlaylistUrl: string;
   readonly parallel: number;
   readonly outputFormat: OutputFormat;
@@ -1584,42 +1589,214 @@ function attachFfmpegProgressStatus(
   });
 }
 
-async function writeSegmentBytesToFfmpeg(
-  ffmpeg: FFmpeg,
-  bytes: readonly Uint8Array[],
-  start: number,
-  partPaths: string[],
+async function streamOrderedSegmentsWithDiscontinuities(
+  media: MediaPlaylistAnalysis,
+  parallel: number,
   signal: AbortSignal,
+  trackProgress: boolean,
+  onDiscontinuity: () => Promise<void>,
+  onChunk: (chunk: Uint8Array) => Promise<void>,
 ): Promise<void> {
-  for (const [offset, chunk] of bytes.entries()) {
-    const partName = `segment-${String(start + offset + 1).padStart(6, "0")}.ts`;
+  await fetchOrderedSegmentGroups(
+    media,
+    parallel,
+    signal,
+    async (segmentGroup, bytes, start) => {
+      for (const [offset, chunk] of bytes.entries()) {
+        const segment = segmentGroup[offset];
 
-    await ffmpeg.writeFile(partName, chunk, { signal });
-    partPaths.push(partName);
-    progress.value = start + offset + 1;
+        if (
+          shouldSplitDiscontinuityPart(
+            Boolean(segment?.discontinuity),
+            start + offset,
+          )
+        ) {
+          await onDiscontinuity();
+        }
+
+        await onChunk(chunk);
+        if (trackProgress) progress.value = start + offset + 1;
+      }
+    },
+  );
+}
+
+async function writeMediaStreamToOpfs(
+  dir: FileSystemDirectoryHandle,
+  prefix: string,
+  media: MediaPlaylistAnalysis,
+  parallel: number,
+  signal: AbortSignal,
+  trackProgress: boolean,
+): Promise<string[]> {
+  if (!media.map && prefix === "part") {
+    return writeSegmentsToOpfs(dir, media, parallel, signal);
   }
+
+  const initBytes = media.map
+    ? await fetchSegment({ uri: media.map.uri, range: media.map.range }, signal)
+    : null;
+
+  const extension = media.map ? "mp4" : "ts";
+  const partNames: string[] = [];
+
+  const streamState: {
+    partIndex: number;
+    writable: FileSystemWritableFileStream | null;
+  } = { partIndex: 0, writable: null };
+
+  const openPart = async (): Promise<void> => {
+    const name = `${prefix}-${String(streamState.partIndex).padStart(6, "0")}.${extension}`;
+    const handle = await dir.getFileHandle(name, { create: true });
+
+    streamState.writable = await handle.createWritable();
+    partNames.push(name);
+    streamState.partIndex += 1;
+
+    if (initBytes) await streamState.writable.write(new Uint8Array(initBytes));
+  };
+
+  try {
+    await openPart();
+
+    await streamOrderedSegmentsWithDiscontinuities(
+      media,
+      parallel,
+      signal,
+      trackProgress,
+      async () => {
+        await streamState.writable?.close();
+        streamState.writable = null;
+        await openPart();
+      },
+      async (chunk) => {
+        await streamState.writable?.write(new Uint8Array(chunk));
+      },
+    );
+
+    await streamState.writable?.close();
+    streamState.writable = null;
+
+    return partNames;
+  } catch (error) {
+    await streamState.writable?.abort().catch(() => {});
+    streamState.writable = null;
+    throw error;
+  }
+}
+
+async function writeMediaStreamToMemfs(
+  ffmpeg: FFmpeg,
+  prefix: string,
+  media: MediaPlaylistAnalysis,
+  parallel: number,
+  signal: AbortSignal,
+  trackProgress: boolean,
+): Promise<string[]> {
+  if (!media.map) {
+    const partPaths: string[] = [];
+
+    await fetchOrderedSegmentGroups(
+      media,
+      parallel,
+      signal,
+      async (_segmentGroup, bytes, start) => {
+        for (const [offset, chunk] of bytes.entries()) {
+          const partName = `${prefix}-${String(start + offset + 1).padStart(6, "0")}.ts`;
+
+          await ffmpeg.writeFile(partName, chunk, { signal });
+          partPaths.push(partName);
+          if (trackProgress) progress.value = start + offset + 1;
+        }
+      },
+    );
+
+    return partPaths;
+  }
+
+  const initBytes = await fetchSegment(
+    { uri: media.map.uri, range: media.map.range },
+    signal,
+  );
+
+  const partChunks: Uint8Array[][] = [[initBytes]];
+
+  await streamOrderedSegmentsWithDiscontinuities(
+    media,
+    parallel,
+    signal,
+    trackProgress,
+    async () => {
+      partChunks.push([initBytes]);
+    },
+    async (chunk) => {
+      partChunks.at(-1)?.push(chunk);
+    },
+  );
+
+  const partPaths: string[] = [];
+
+  for (const [partIndex, chunks] of partChunks.entries()) {
+    const totalLength = chunks.reduce((sum, item) => sum + item.byteLength, 0);
+    const merged = new Uint8Array(totalLength);
+    const offsetState = { byteOffset: 0 };
+
+    for (const chunk of chunks) {
+      merged.set(chunk, offsetState.byteOffset);
+      offsetState.byteOffset += chunk.byteLength;
+    }
+
+    const partName = `${prefix}-${String(partIndex).padStart(6, "0")}.mp4`;
+
+    await ffmpeg.writeFile(partName, merged, { signal });
+    partPaths.push(partName);
+  }
+
+  return partPaths;
+}
+
+function buildInputArgs(
+  partPaths: readonly string[],
+  manifestName: string,
+): { readonly args: readonly string[]; readonly needsConcat: boolean } {
+  if (partPaths.length === 1 && partPaths[0]?.endsWith(".mp4")) {
+    return { args: ["-i", partPaths[0]], needsConcat: false };
+  }
+
+  return {
+    args: [
+      "-f",
+      "concat",
+      "-safe",
+      "0",
+      "-fflags",
+      "+genpts",
+      "-i",
+      manifestName,
+    ],
+    needsConcat: true,
+  };
 }
 
 function buildFfmpegRemuxArgs(
   outputPath: string,
   outputFormat: OutputFormat,
   embeddedSubtitle: string | null,
+  videoInputArgs: readonly string[],
+  audioInputArgs: readonly string[],
 ): string[] {
+  const hasSeparateAudio = audioInputArgs.length > 0;
+  const subtitleInputIndex = hasSeparateAudio ? 2 : 1;
+
   return [
-    "-f",
-    "concat",
-    "-safe",
-    "0",
-    "-fflags",
-    "+genpts",
-    "-i",
-    "segments.txt",
+    ...videoInputArgs,
+    ...audioInputArgs,
     ...(embeddedSubtitle ? ["-i", "subtitle.vtt"] : []),
     "-map",
     "0:v:0",
     "-map",
-    "0:a:0?",
-    ...(embeddedSubtitle ? ["-map", "1:0"] : []),
+    hasSeparateAudio ? "1:a:0" : "0:a:0?",
+    ...(embeddedSubtitle ? ["-map", `${subtitleInputIndex}:0`] : []),
     "-c:v",
     "copy",
     "-c:a",
@@ -1637,6 +1814,7 @@ function buildFfmpegRemuxArgs(
 async function runFfmpegConcatRemux({
   ffmpeg,
   partPaths,
+  audioPartPaths = [],
   outputPath,
   outputFormat,
   embeddedSubtitle,
@@ -1644,6 +1822,7 @@ async function runFfmpegConcatRemux({
 }: {
   readonly ffmpeg: FFmpeg;
   readonly partPaths: readonly string[];
+  readonly audioPartPaths?: readonly string[];
   readonly outputPath: string;
   readonly outputFormat: OutputFormat;
   readonly embeddedSubtitle: string | null;
@@ -1654,11 +1833,33 @@ async function runFfmpegConcatRemux({
     "FFmpeg is copying H.264/AAC streams without re-encoding…",
   );
 
-  const concatList = buildConcatManifest(partPaths);
+  const videoInput = buildInputArgs(partPaths, "segments.txt");
 
-  await ffmpeg.writeFile("segments.txt", new TextEncoder().encode(concatList), {
-    signal,
-  });
+  if (videoInput.needsConcat) {
+    const concatList = buildConcatManifest(partPaths);
+
+    await ffmpeg.writeFile(
+      "segments.txt",
+      new TextEncoder().encode(concatList),
+      {
+        signal,
+      },
+    );
+  }
+
+  const audioInput = audioPartPaths.length
+    ? buildInputArgs(audioPartPaths, "audio-segments.txt")
+    : { args: [], needsConcat: false };
+
+  if (audioInput.needsConcat) {
+    const audioConcatList = buildConcatManifest(audioPartPaths);
+
+    await ffmpeg.writeFile(
+      "audio-segments.txt",
+      new TextEncoder().encode(audioConcatList),
+      { signal },
+    );
+  }
 
   if (embeddedSubtitle) {
     await ffmpeg.writeFile(
@@ -1669,10 +1870,35 @@ async function runFfmpegConcatRemux({
   }
 
   return ffmpeg.exec(
-    buildFfmpegRemuxArgs(outputPath, outputFormat, embeddedSubtitle),
+    buildFfmpegRemuxArgs(
+      outputPath,
+      outputFormat,
+      embeddedSubtitle,
+      videoInput.args,
+      audioInput.args,
+    ),
     -1,
     { signal },
   );
+}
+
+async function createAttachedFfmpeg(
+  outputFormat: OutputFormat,
+  totalDurationSeconds: number,
+  signal: AbortSignal,
+): Promise<{ readonly ffmpeg: FFmpeg; readonly stopFfmpeg: () => void }> {
+  setStatus(
+    "Loading the MP4 engine…",
+    "Preparing lossless FFmpeg remuxing (one-time 32 MB engine load)…",
+  );
+
+  const ffmpeg = await createFfmpeg(signal);
+  const stopFfmpeg = (): void => ffmpeg.terminate();
+
+  signal.addEventListener("abort", stopFfmpeg, { once: true });
+  attachFfmpegProgressStatus(ffmpeg, outputFormat, totalDurationSeconds);
+
+  return { ffmpeg, stopFfmpeg };
 }
 
 async function remuxWithOpfsWorkspace(
@@ -1681,6 +1907,7 @@ async function remuxWithOpfsWorkspace(
 ): Promise<number> {
   const {
     media,
+    audioMedia = null,
     parallel,
     outputFormat,
     outputFilename,
@@ -1695,36 +1922,39 @@ async function remuxWithOpfsWorkspace(
   appState.activeOpfsJobDir = workspace.jobDir;
 
   try {
-    const partNames = await writeSegmentsToOpfs(
+    const partNames = await writeMediaStreamToOpfs(
       workspace.dir,
+      "part",
       media,
       parallel,
       signal,
+      true,
     );
+
+    const audioPartNames = audioMedia
+      ? await writeMediaStreamToOpfs(
+          workspace.dir,
+          "audio-part",
+          audioMedia,
+          parallel,
+          signal,
+          false,
+        )
+      : [];
 
     await workspace.dir.removeEntry(outputName).catch(() => {});
 
-    setStatus(
-      "Loading the MP4 engine…",
-      "Preparing lossless FFmpeg remuxing (one-time 32 MB engine load)…",
-    );
-
-    const ffmpeg = await createFfmpeg(signal);
-    const stopFfmpeg = (): void => ffmpeg.terminate();
-
-    signal.addEventListener("abort", stopFfmpeg, { once: true });
-
-    attachFfmpegProgressStatus(
-      ffmpeg,
+    const { ffmpeg, stopFfmpeg } = await createAttachedFfmpeg(
       outputFormat,
       media.totalDurationSeconds,
+      signal,
     );
 
     try {
       await ffmpeg.mountOpfs(
         {
           jobDir: workspace.jobDir,
-          readOnlyFiles: partNames,
+          readOnlyFiles: [...partNames, ...audioPartNames],
           readWriteFiles: [outputName],
           mountPoint,
         },
@@ -1734,6 +1964,7 @@ async function remuxWithOpfsWorkspace(
       const exitCode = await runFfmpegConcatRemux({
         ffmpeg,
         partPaths: partNames.map((name) => `${mountPoint}/${name}`),
+        audioPartPaths: audioPartNames.map((name) => `${mountPoint}/${name}`),
         outputPath: `${mountPoint}/${outputName}`,
         outputFormat,
         embeddedSubtitle,
@@ -1754,7 +1985,7 @@ async function remuxWithOpfsWorkspace(
       ffmpeg.terminate();
     }
 
-    for (const partName of partNames) {
+    for (const partName of [...partNames, ...audioPartNames]) {
       await workspace.dir.removeEntry(partName).catch(() => {});
     }
 
@@ -1800,6 +2031,7 @@ async function remuxWithMemfsFallback(
 ): Promise<number> {
   const {
     media,
+    audioMedia = null,
     parallel,
     outputFormat,
     outputFilename,
@@ -1807,39 +2039,51 @@ async function remuxWithMemfsFallback(
     signal,
   } = options;
 
-  setStatus(
-    "Loading the MP4 engine…",
-    "Preparing lossless FFmpeg remuxing (one-time 32 MB engine load)…",
+  const { ffmpeg, stopFfmpeg } = await createAttachedFfmpeg(
+    outputFormat,
+    media.totalDurationSeconds,
+    signal,
   );
 
-  const ffmpeg = await createFfmpeg(signal);
-  const partPaths: string[] = [];
-  const stopFfmpeg = (): void => ffmpeg.terminate();
-
-  signal.addEventListener("abort", stopFfmpeg, { once: true });
-  attachFfmpegProgressStatus(ffmpeg, outputFormat, media.totalDurationSeconds);
-
   try {
-    await fetchOrderedSegmentGroups(
+    const partPaths = await writeMediaStreamToMemfs(
+      ffmpeg,
+      "segment",
       media,
       parallel,
       signal,
-      (_segmentGroup, bytes, start) =>
-        writeSegmentBytesToFfmpeg(ffmpeg, bytes, start, partPaths, signal),
+      true,
     );
+
+    const audioPartPaths = audioMedia
+      ? await writeMediaStreamToMemfs(
+          ffmpeg,
+          "audio-segment",
+          audioMedia,
+          parallel,
+          signal,
+          false,
+        )
+      : [];
 
     const outputPath = `output.${outputFormat}`;
 
     const exitCode = await runFfmpegConcatRemux({
       ffmpeg,
       partPaths,
+      audioPartPaths,
       outputPath,
       outputFormat,
       embeddedSubtitle,
       signal,
     });
 
-    for (const partPath of [...partPaths, "segments.txt"]) {
+    for (const partPath of [
+      ...partPaths,
+      ...audioPartPaths,
+      "segments.txt",
+      "audio-segments.txt",
+    ]) {
       await ffmpeg.deleteFile(partPath, { signal }).catch(() => {});
     }
 
@@ -1991,10 +2235,18 @@ async function startDownload(): Promise<"completed" | "cancelled"> {
           throw new Error("Live or unfinished playlists are not supported.");
         }
 
-        if (media.map) {
-          throw new Error(
-            "Fragmented MP4 HLS input is not supported yet; choose an MPEG-TS playlist.",
-          );
+        const audioMedia = selected.audioUri
+          ? parsePlaylist(
+              await fetchText(selected.audioUri, controller.signal),
+              selected.audioUri,
+            )
+          : null;
+
+        if (
+          audioMedia &&
+          (audioMedia.type !== "media" || !audioMedia.complete)
+        ) {
+          throw new Error("Separate audio manifest is incomplete or invalid.");
         }
 
         progress.max = media.segments.length;
@@ -2008,6 +2260,7 @@ async function startDownload(): Promise<"completed" | "cancelled"> {
 
         const outputBytes = await remuxSegmentsAndSave({
           media,
+          audioMedia: audioMedia?.type === "media" ? audioMedia : null,
           mediaPlaylistUrl: selectedMediaUrl,
           parallel: clampConcurrency(Number(concurrency.value)),
           outputFormat,
@@ -2025,6 +2278,20 @@ async function startDownload(): Promise<"completed" | "cancelled"> {
           embeddedSubtitle,
           signal: controller.signal,
         });
+
+        if (
+          !appState.trackRunActive &&
+          appState.singleDownloadDocuments &&
+          countTopicCompanionDocuments(appState.singleDownloadDocuments) > 0
+        ) {
+          const singleTitle = outputFilename.replace(/\.(?:mp4|mkv)$/i, "");
+
+          await downloadTopicCompanionDocuments(
+            singleTitle,
+            appState.singleDownloadDocuments,
+            controller.signal,
+          );
+        }
 
         persistRun({
           state: "completed",
@@ -2287,7 +2554,7 @@ interface ExportSlidesResponse {
 interface DownloadedDocumentRecord {
   readonly url: string;
   readonly canonicalKey: string;
-  readonly kind: "image" | "pdf" | "diagram" | "slides" | "note";
+  readonly kind: TopicFileAsset["kind"] | "diagram" | "slides" | "note";
   readonly filename: string;
   readonly folderPath: readonly string[];
   readonly status: "downloaded" | "failed";
@@ -2308,18 +2575,79 @@ function inferImageExtension(
   filenameValue: string,
   contentType: string,
 ): string {
-  const mime = contentType.split(";")[0].trim().toLowerCase();
-  const byMime = IMAGE_CONTENT_TYPES[mime];
+  const mimeType = contentType.split(";")[0].trim().toLowerCase();
+  const extensionByMimeType = IMAGE_CONTENT_TYPES[mimeType];
 
-  if (byMime) return byMime;
+  if (extensionByMimeType) return extensionByMimeType;
 
-  const extMatch = /\.(png|jpe?g|webp|gif|svg)$/i.exec(filenameValue.trim());
+  const extensionMatch = /\.(png|jpe?g|webp|gif|svg)$/i.exec(
+    filenameValue.trim(),
+  );
 
-  if (!extMatch) return "png";
+  if (!extensionMatch) return "png";
 
-  const ext = extMatch[1].toLowerCase();
+  const extension = extensionMatch[1].toLowerCase();
 
-  return ext === "jpeg" ? "jpg" : ext;
+  return extension === "jpeg" ? "jpg" : extension;
+}
+
+const GENERIC_FILE_MIME_EXTENSIONS: Readonly<Record<string, string>> =
+  Object.freeze({
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation":
+      "pptx",
+    "application/vnd.ms-powerpoint": "ppt",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+      "docx",
+    "application/msword": "doc",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+    "application/vnd.ms-excel": "xls",
+    "application/zip": "zip",
+    "application/x-zip-compressed": "zip",
+    "text/csv": "csv",
+    "text/plain": "txt",
+    "text/markdown": "md",
+    "application/json": "json",
+    "application/pdf": "pdf",
+  });
+
+function inferGenericFileExtension(
+  filenameValue: string,
+  contentType: string,
+): string {
+  const extensionMatch = /\.([a-z0-9]{2,6})$/i.exec(filenameValue.trim());
+
+  if (extensionMatch) return extensionMatch[1].toLowerCase();
+
+  const mimeType = contentType.split(";")[0].trim().toLowerCase();
+
+  return GENERIC_FILE_MIME_EXTENSIONS[mimeType] || "bin";
+}
+
+function genericFileMimeType(contentType: string): string {
+  const mimeType = contentType.split(";")[0].trim().toLowerCase();
+
+  return mimeType || "application/octet-stream";
+}
+
+function resolvedFileAssetFormat(
+  kind: TopicFileAsset["kind"],
+  assetFilename: string,
+  contentType: string,
+): { readonly extension: string; readonly mimeType: string } {
+  if (kind === "pdf") {
+    return { extension: "pdf", mimeType: "application/pdf" };
+  }
+
+  if (kind === "image") {
+    const extension = inferImageExtension(assetFilename, contentType);
+
+    return { extension, mimeType: imageMimeType(extension) };
+  }
+
+  return {
+    extension: inferGenericFileExtension(assetFilename, contentType),
+    mimeType: genericFileMimeType(contentType),
+  };
 }
 
 function imageMimeType(extension: string): string {
@@ -2480,7 +2808,15 @@ function fileAssetFallbackStem(
   kind: TopicFileAsset["kind"],
   index: number,
 ): string {
-  if (kind !== "pdf") return `Image ${index + 1}`;
+  if (kind === "image") return `Image ${index + 1}`;
+
+  if (kind === "pptx") {
+    return index ? `Presentation ${index + 1}` : "Presentation";
+  }
+
+  if (kind === "xlsx" || kind === "csv") {
+    return index ? `Spreadsheet ${index + 1}` : "Spreadsheet";
+  }
 
   return index ? `Document ${index + 1}` : "Document";
 }
@@ -2727,6 +3063,25 @@ function existingDocumentFilenameOnDisk(
     return isAlreadyDownloadedFile(pdfCandidate) ? pdfCandidate : null;
   }
 
+  if (asset.kind !== "image") {
+    const fileExt = inferGenericFileExtension(
+      asset.filename,
+      asset.contentType || "",
+    );
+
+    const fileCandidate = peekUniqueDocumentFilename(
+      prefixedDocumentFilename(
+        topicTitle,
+        asset.filename,
+        fileExt,
+        fallbackStem,
+      ),
+      usedFilenames,
+    );
+
+    return isAlreadyDownloadedFile(fileCandidate) ? fileCandidate : null;
+  }
+
   const explicitMatch = /\.(png|jpe?g|webp|gif|svg|avif)$/i.exec(
     asset.filename.trim(),
   );
@@ -2762,7 +3117,6 @@ async function downloadDocumentFiles(
 
   for (const [index, asset] of assets.entries()) {
     throwIfAborted(context.signal);
-    const isPdf = asset.kind === "pdf";
     const fallbackStem = fileAssetFallbackStem(asset.kind, index);
 
     const lookup = tryReuseDownloadedDocument(
@@ -2806,24 +3160,24 @@ async function downloadDocumentFiles(
           context.signal,
         );
 
-        const ext = isPdf
-          ? "pdf"
-          : inferImageExtension(asset.filename, contentType);
-
-        const mime = isPdf ? "application/pdf" : imageMimeType(ext);
+        const { extension, mimeType } = resolvedFileAssetFormat(
+          asset.kind,
+          asset.filename,
+          contentType,
+        );
 
         const targetName = uniqueDocumentFilename(
           prefixedDocumentFilename(
             context.topicTitle,
             asset.filename,
-            ext,
+            extension,
             fallbackStem,
           ),
           context.usedFilenames,
         );
 
         if (!isAlreadyDownloadedFile(targetName)) {
-          await saveBrowserDownload(bytes, targetName, mime);
+          await saveBrowserDownload(bytes, targetName, mimeType);
         }
 
         recordSavedDocument(
@@ -3165,6 +3519,7 @@ async function downloadTopicCompanionDocuments(
   }
 
   counts.saved += await downloadDocumentFiles(documents.pdfs, context);
+  counts.saved += await downloadDocumentFiles(documents.files ?? [], context);
   counts.saved += await downloadDocumentFiles(documents.images, context);
   counts.saved += await downloadDocumentLinks(documents.diagrams, context);
   counts.saved += await downloadDocumentLinks(documents.slides, context);
@@ -4002,7 +4357,7 @@ async function processTrackQueueTopic(
   return !shouldHaltTrackQueue(attempt.kind, queueState);
 }
 
-/** Downloads the selected playlist items in their displayed order. */
+/** Downloads the selected track topics in their displayed order. */
 async function runTrackDownloads(
   trackDownload: TrackDownloadPlan,
 ): Promise<void> {
@@ -4210,6 +4565,7 @@ if (downloadRequestId) {
           handoffDownload.selectedQualityUrl || null;
 
         appState.selectedSubtitleTrack = handoffDownload.subtitle || null;
+        appState.singleDownloadDocuments = handoffDownload.documents || null;
         appState.sourceTabId = handoffDownload.sourceTabId ?? null;
         const autoStart = handoffDownload.autoStart === true;
 

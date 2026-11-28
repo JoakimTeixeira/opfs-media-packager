@@ -1,5 +1,7 @@
+import type { TopicFileAssetKind } from "./topic-assets.ts";
+
 export interface DownloadedArtifactAnnotation {
-  readonly kind: "image" | "pdf" | "diagram" | "slides" | "note" | "video";
+  readonly kind: TopicFileAssetKind | "diagram" | "slides" | "note" | "video";
   readonly url: string;
   readonly fallbackUrl?: string;
   readonly filename: string;
@@ -16,6 +18,15 @@ const ARTIFACT_KIND_LABELS: Readonly<
   Record<DownloadedArtifactAnnotation["kind"], string>
 > = {
   pdf: "PDF",
+  pptx: "PPTX",
+  docx: "DOCX",
+  xlsx: "XLSX",
+  csv: "CSV",
+  md: "MD",
+  txt: "TXT",
+  zip: "ZIP",
+  json: "JSON",
+  document: "Documento",
   image: "Imagem",
   diagram: "Diagrama",
   slides: "Slides",
@@ -116,6 +127,15 @@ export function stripRelatedContentSections(markdown: string): string {
 
 const ARTIFACT_KINDS: readonly DownloadedArtifactAnnotation["kind"][] = [
   "pdf",
+  "pptx",
+  "docx",
+  "xlsx",
+  "csv",
+  "md",
+  "txt",
+  "zip",
+  "json",
+  "document",
   "image",
   "diagram",
   "slides",

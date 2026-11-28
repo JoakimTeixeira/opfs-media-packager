@@ -52,19 +52,27 @@ test("should count and summarize lesson materials accurately", () => {
     title: "S1",
   };
 
+  const file1: TopicFileAsset = {
+    kind: "pptx",
+    url: "https://cdn.example/deck-token",
+    filename: "Deck.pptx",
+  };
+
   const single: TopicCompanionDocuments = {
     markdown: "# Lesson\n",
     images: [img1],
     pdfs: [pdf1],
+    files: [file1],
     diagrams: [diag1],
     slides: [slide1],
   };
 
-  assert.equal(countTopicCompanionDocuments(single), 5);
+  assert.equal(countTopicCompanionDocuments(single), 6);
 
   assert.deepEqual(summarizeTopicCompanionDocuments(single), [
     "MD",
     "1 PDF",
+    "1 PPTX",
     "1 image",
     "1 diagram",
     "1 slides",
@@ -80,6 +88,19 @@ test("should count and summarize lesson materials accurately", () => {
       pdf1,
       { kind: "pdf", url: "https://cdn.example/2.pdf", filename: "2.pdf" },
     ],
+    files: [
+      file1,
+      {
+        kind: "xlsx",
+        url: "https://cdn.example/sheet-token",
+        filename: "Sheet.xlsx",
+      },
+      {
+        kind: "document",
+        url: "https://cdn.example/other-token",
+        filename: "custom.bin",
+      },
+    ],
     diagrams: [
       diag1,
       { kind: "diagram", url: "https://excalidraw.com/#2", title: "D2" },
@@ -90,10 +111,13 @@ test("should count and summarize lesson materials accurately", () => {
     ],
   };
 
-  assert.equal(countTopicCompanionDocuments(plural), 8);
+  assert.equal(countTopicCompanionDocuments(plural), 11);
 
   assert.deepEqual(summarizeTopicCompanionDocuments(plural), [
     "2 PDFs",
+    "1 PPTX",
+    "1 XLSX",
+    "1 document",
     "2 images",
     "2 diagrams",
     "2 slides",

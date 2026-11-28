@@ -114,7 +114,10 @@ export function canonicalDocumentUrlKey(
   if (!safe) return rawUrl.trim();
 
   const normalized =
-    kind === "image" || kind === "pdf"
+    kind !== "diagram" &&
+    kind !== "slides" &&
+    kind !== "note" &&
+    kind !== "video"
       ? activeStorageBlobUrl(safe) || safe
       : safe;
 

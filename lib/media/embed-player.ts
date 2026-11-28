@@ -10,7 +10,7 @@ import {
   type VideoQualityOption,
 } from "./hls-master.ts";
 
-interface EmbedAuthorizationRule {
+export interface EmbedAuthorizationRule {
   readonly id: number;
   readonly priority: number;
   readonly action: {

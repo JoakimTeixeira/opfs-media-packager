@@ -20,6 +20,8 @@ import {
 } from "../lib/subtitles/subtitle-tracks.ts";
 import {
   countTopicCompanionDocuments,
+  inferAttachedDocumentKind,
+  isAttachedDocumentKind,
   isExcalidrawUrl,
   isTopicDownloadableForMode,
   mergeTopicCompanionDocuments,
@@ -76,6 +78,12 @@ import {
 import { isSupplementaryLinkedPostUrl } from "../lib/materials/linked-video.ts";
 import { mergeDetectedStreams } from "../lib/media/stream-collection.ts";
 import { playlistMediaAuthorizationRule } from "../lib/media/media-authorization.ts";
+import {
+  embedPlayerAuthorizationRule,
+  normalizeEmbedPlayerUrl,
+  parseEmbedPlayerConfig,
+  type EmbedAuthorizationRule,
+} from "../lib/media/embed-player.ts";
 import { isApiTrackPage, isTrackPage } from "../lib/track/track-adapters.ts";
 import {
   DEFAULT_DOWNLOAD_PREFERENCES,
@@ -148,6 +156,7 @@ interface TabDetectionState {
   pageUrl: string;
   streams: ProbedStream[];
   subtitles: SubtitleTrack[];
+  documents?: TopicCompanionDocuments;
 }
 
 interface TrackScan {
@@ -166,6 +175,7 @@ interface TrackScan {
 interface TrackStreamSignal {
   readonly url?: unknown;
   readonly mediaUrl?: unknown;
+  readonly embedUrl?: unknown;
   readonly subtitles?: readonly SubtitleCandidate[];
   readonly linkedTitle?: unknown;
   readonly sourceUrl?: unknown;
@@ -187,6 +197,7 @@ interface PendingPageMediaRequest {
 interface ProbeJob {
   readonly topicIndex: number;
   readonly rawUrl: string;
+  readonly embedUrl?: string;
   readonly subtitles: readonly SubtitleCandidate[];
   readonly linkedTitle: string;
   readonly sourceUrl: string;
@@ -636,6 +647,7 @@ async function getState(tabId: number): Promise<TabDetectionState> {
   }
 
   const record = externalRecord(value);
+  const documents = validatedDocumentsRecord(record?.documents);
 
   return {
     pageUrl: typeof record?.pageUrl === "string" ? record.pageUrl : "",
@@ -643,6 +655,7 @@ async function getState(tabId: number): Promise<TabDetectionState> {
     subtitles: Array.isArray(record?.subtitles)
       ? (record.subtitles as SubtitleTrack[])
       : [],
+    ...(documents ? { documents } : {}),
   };
 }
 
@@ -702,6 +715,26 @@ async function setState(
   }
 }
 
+function toMutableSessionRule(
+  rule: EmbedAuthorizationRule,
+  ruleId: number,
+): chrome.declarativeNetRequest.Rule {
+  return {
+    ...rule,
+    id: ruleId,
+    action: {
+      ...rule.action,
+      requestHeaders: rule.action.requestHeaders.map((header) => ({
+        ...header,
+      })),
+    },
+    condition: {
+      ...rule.condition,
+      resourceTypes: [...rule.condition.resourceTypes],
+    },
+  };
+}
+
 async function authorizeMediaUrl(
   mediaUrl: string,
   sourceUrl: string,
@@ -713,22 +746,7 @@ async function authorizeMediaUrl(
     chrome.runtime.id,
   );
 
-  const sessionRule: chrome.declarativeNetRequest.Rule | null = rule
-    ? {
-        ...rule,
-        id: ruleId,
-        action: {
-          ...rule.action,
-          requestHeaders: rule.action.requestHeaders.map((header) => ({
-            ...header,
-          })),
-        },
-        condition: {
-          ...rule.condition,
-          resourceTypes: [...rule.condition.resourceTypes],
-        },
-      }
-    : null;
+  const sessionRule = rule ? toMutableSessionRule(rule, ruleId) : null;
 
   await chrome.declarativeNetRequest.updateSessionRules({
     removeRuleIds: [ruleId],
@@ -1143,13 +1161,16 @@ async function buildProbedStream(
   });
 }
 
-function validatedFileAssets(
+function validatedFileAssetEntries(
   value: ExternalValue,
-  kind: "image" | "pdf",
+  defaultFilename: string,
+  resolveKind: (
+    record: ExternalRecord,
+    filename: string,
+    contentType: string,
+  ) => TopicFileAsset["kind"],
 ): readonly TopicFileAsset[] {
   if (!Array.isArray(value)) return Object.freeze([]);
-
-  const defaultFilename = kind === "pdf" ? "document.pdf" : "image.png";
 
   return Object.freeze(
     value.slice(0, 100).flatMap((entry): TopicFileAsset[] => {
@@ -1163,6 +1184,7 @@ function validatedFileAssets(
         boundedText(record.filename, 200).trim() || defaultFilename;
 
       const contentType = boundedText(record.contentType, 120).trim();
+      const kind = resolveKind(record, filename, contentType);
 
       return [
         Object.freeze({
@@ -1174,6 +1196,30 @@ function validatedFileAssets(
         }),
       ];
     }),
+  );
+}
+
+function validatedAttachedFileAssets(
+  value: ExternalValue,
+): readonly TopicFileAsset[] {
+  return validatedFileAssetEntries(
+    value,
+    "document.bin",
+    (record, filename, contentType) =>
+      isAttachedDocumentKind(record.kind)
+        ? record.kind
+        : inferAttachedDocumentKind(filename, contentType),
+  );
+}
+
+function validatedFileAssets(
+  value: ExternalValue,
+  kind: "image" | "pdf",
+): readonly TopicFileAsset[] {
+  return validatedFileAssetEntries(
+    value,
+    kind === "pdf" ? "document.pdf" : "image.png",
+    () => kind,
   );
 }
 
@@ -1240,11 +1286,13 @@ function validatedDocumentsRecord(
       : "";
 
   const extraNotes = validatedExtraNotes(record.extraNotes);
+  const files = validatedAttachedFileAssets(record.files);
 
   const documents: TopicCompanionDocuments = Object.freeze({
     markdown,
     images: validatedFileAssets(record.images, "image"),
     pdfs: validatedFileAssets(record.pdfs, "pdf"),
+    ...(files.length ? { files } : {}),
     diagrams: validatedLinkAssets(record.diagrams, "diagram"),
     slides: validatedLinkAssets(record.slides, "slides"),
     ...(extraNotes.length ? { extraNotes } : {}),
@@ -1718,6 +1766,234 @@ function resolveHiddenFrameProbe(
   return null;
 }
 
+async function resolveEmbedPlayerStream(
+  rawEmbedUrl: string,
+  sourceUrl: string,
+  extraSubtitleUrls: readonly SubtitleCandidate[] = [],
+  ruleId = mediaAuthorizationRuleId,
+  fallbackText = "",
+  sourceTabId: number | null = null,
+): Promise<ProbedStream | null> {
+  const embedUrl = normalizeEmbedPlayerUrl(rawEmbedUrl);
+
+  if (!embedUrl) return null;
+
+  const rule = embedPlayerAuthorizationRule(
+    embedUrl,
+    sourceUrl,
+    chrome.runtime.id,
+    ruleId,
+  );
+
+  if (rule) {
+    await chrome.declarativeNetRequest
+      .updateSessionRules({
+        removeRuleIds: [ruleId],
+        addRules: [toMutableSessionRule(rule, ruleId)],
+      })
+      .catch(() => {});
+  }
+
+  try {
+    const response = await fetch(embedUrl, {
+      cache: "no-store",
+      credentials: "omit",
+      redirect: "follow",
+    }).catch(() => null);
+
+    if (!response?.ok) return null;
+
+    const parsed = parseEmbedPlayerConfig(await response.text(), embedUrl);
+
+    if (!parsed) return null;
+
+    const combinedSubtitles: SubtitleCandidate[] = [
+      ...parsed.subtitles,
+      ...extraSubtitleUrls,
+    ];
+
+    const effectiveTitle = parsed.title || fallbackText;
+
+    if (parsed.hlsUrl) {
+      const hlsStream = await buildProbedStream(
+        parsed.hlsUrl,
+        sourceUrl,
+        combinedSubtitles,
+        ruleId,
+        effectiveTitle,
+        sourceTabId,
+      );
+
+      if (hlsStream) {
+        return parsed.title
+          ? Object.freeze({ ...hlsStream, title: parsed.title })
+          : hlsStream;
+      }
+    }
+
+    if (!parsed.progressiveOptions.length) return null;
+
+    const subtitles = await resolveExtraSubtitleList(
+      combinedSubtitles,
+      sourceUrl,
+      effectiveTitle,
+      sourceTabId,
+    );
+
+    const bestUrl = parsed.progressiveOptions[0].url;
+
+    return Object.freeze({
+      key: streamIdentity(bestUrl) || bestUrl,
+      url: bestUrl,
+      host: new URL(bestUrl).host,
+      title: parsed.title || "Track stream",
+      sourceUrl,
+      kind: "direct" as const,
+      qualityOptions: parsed.progressiveOptions,
+      subtitles: uniqueSubtitles(subtitles),
+      detectedAt: Date.now(),
+    });
+  } finally {
+    if (rule) {
+      await chrome.declarativeNetRequest
+        .updateSessionRules({ removeRuleIds: [ruleId] })
+        .catch(() => {});
+    }
+  }
+}
+
+async function storeActiveTabProbedStream(
+  tabId: number,
+  pageUrl: string,
+  built: ProbedStream,
+  documents?: TopicCompanionDocuments,
+): Promise<void> {
+  await enqueueDetection(async () => {
+    const state = await synchronizePageState(tabId, pageUrl);
+    const key = streamIdentity(built.url) || built.key || built.url;
+
+    const existing = state.streams.find(
+      (item) => (streamIdentity(item.url) || item.key || item.url) === key,
+    );
+
+    const merged: ProbedStream = Object.freeze({
+      ...built,
+      title:
+        existing?.title && existing.title !== "Track stream"
+          ? existing.title
+          : built.title,
+      qualityOptions: uniqueQualityOptions([
+        ...built.qualityOptions,
+        ...(existing?.qualityOptions || []),
+      ]),
+      subtitles: uniqueSubtitles([
+        ...built.subtitles,
+        ...(existing?.subtitles || []),
+      ]),
+    });
+
+    const streams = [
+      merged,
+      ...state.streams.filter(
+        (item) => (streamIdentity(item.url) || item.key || item.url) !== key,
+      ),
+    ];
+
+    const subtitles = uniqueSubtitles([
+      ...state.subtitles,
+      ...merged.subtitles,
+    ]);
+
+    const mergedDocuments = mergeTopicCompanionDocuments(
+      state.documents,
+      documents,
+    );
+
+    await setState(tabId, {
+      pageUrl: state.pageUrl || pageUrl,
+      streams,
+      subtitles,
+      ...(mergedDocuments ? { documents: mergedDocuments } : {}),
+    });
+  });
+}
+
+async function resolveFrameProbeStream(
+  frameProbe: HiddenFrameProbe,
+  baseUrl: string | null,
+  embedUrl: string | null,
+  extraSubtitles: readonly SubtitleCandidate[],
+  tabId: number,
+): Promise<ProbedStream | null> {
+  if (baseUrl) {
+    return buildProbedStream(
+      baseUrl,
+      frameProbe.sourceUrl,
+      extraSubtitles,
+      frameProbe.ruleId,
+      frameProbe.topicTitle,
+      tabId,
+    );
+  }
+
+  return embedUrl
+    ? resolveEmbedPlayerStream(
+        embedUrl,
+        frameProbe.sourceUrl,
+        extraSubtitles,
+        frameProbe.ruleId,
+        frameProbe.topicTitle,
+        tabId,
+      )
+    : null;
+}
+
+async function recordTabTrackStream(
+  tabId: number,
+  stream: TrackStreamSignal,
+  baseUrl: string | null,
+  embedUrl: string | null,
+  extraSubtitles: readonly SubtitleCandidate[],
+  documents: TopicCompanionDocuments | undefined,
+): Promise<void> {
+  const tab = await chrome.tabs.get(tabId).catch(() => null);
+  const pageUrl = tab?.url || safeMediaUrl(stream?.sourceUrl) || "";
+
+  if (embedUrl && !baseUrl) {
+    const built = await resolveEmbedPlayerStream(
+      embedUrl,
+      pageUrl,
+      extraSubtitles,
+      mediaAuthorizationRuleId,
+      tab?.title || "",
+      tabId,
+    );
+
+    if (built) {
+      await storeActiveTabProbedStream(tabId, pageUrl, built, documents);
+    }
+
+    return;
+  }
+
+  const probe = await getTabProbe(tabId);
+
+  if (!probe || !baseUrl) return;
+
+  const built = await buildProbedStream(
+    baseUrl,
+    pageUrl,
+    extraSubtitles,
+    mediaAuthorizationRuleId,
+    "",
+    tabId,
+  );
+
+  if (built) {
+    await storeProbedStream(tabId, documents ? { ...built, documents } : built);
+  }
+}
+
 async function recordTrackStream(
   tabId: number,
   stream: TrackStreamSignal,
@@ -1725,17 +2001,22 @@ async function recordTrackStream(
 ): Promise<void> {
   const frameProbe = hiddenFrameProbes.get(hiddenFrameKey(tabId, frameId));
   const baseUrl = safeMediaUrl(stream?.mediaUrl) || safeMediaUrl(stream?.url);
+  const embedUrl = normalizeEmbedPlayerUrl(stream?.embedUrl);
 
-  if (!baseUrl) return;
+  if (!baseUrl && !embedUrl) return;
+
   const documents = validatedDocumentsRecord(stream?.documents);
 
+  const extraSubtitles = Array.isArray(stream?.subtitles)
+    ? stream.subtitles
+    : [];
+
   if (frameProbe) {
-    const built = await buildProbedStream(
+    const built = await resolveFrameProbeStream(
+      frameProbe,
       baseUrl,
-      frameProbe.sourceUrl,
-      [],
-      frameProbe.ruleId,
-      frameProbe.topicTitle,
+      embedUrl,
+      extraSubtitles,
       tabId,
     );
 
@@ -1746,23 +2027,14 @@ async function recordTrackStream(
     return;
   }
 
-  const probe = await getTabProbe(tabId);
-
-  if (!probe) return;
-  const tab = await chrome.tabs.get(tabId).catch(() => null);
-
-  const built = await buildProbedStream(
-    baseUrl,
-    tab?.url || "",
-    [],
-    mediaAuthorizationRuleId,
-    "",
+  await recordTabTrackStream(
     tabId,
+    stream,
+    baseUrl,
+    embedUrl,
+    extraSubtitles,
+    documents,
   );
-
-  if (built) {
-    await storeProbedStream(tabId, documents ? { ...built, documents } : built);
-  }
 }
 
 async function ensureMainWorldProbeInjected(tabId: number): Promise<boolean> {
@@ -1881,19 +2153,44 @@ async function probeTrackTopicsInTab(
         );
       };
 
+      const resolveProbeJobStream = async (
+        job: ProbeJob,
+        slotRuleId: number,
+        titleHint: string,
+      ): Promise<ProbedStream | null> => {
+        if (job.rawUrl) {
+          return buildProbedStream(
+            job.rawUrl,
+            job.sourceUrl || tabUrl,
+            job.subtitles,
+            slotRuleId,
+            titleHint,
+            tabId,
+          );
+        }
+
+        if (!job.embedUrl) return null;
+
+        return resolveEmbedPlayerStream(
+          job.embedUrl,
+          job.sourceUrl || tabUrl,
+          job.subtitles,
+          slotRuleId,
+          titleHint,
+          tabId,
+        );
+      };
+
       const inspectOneJob = async (
         job: ProbeJob,
         slotRuleId: number,
       ): Promise<void> => {
         const topicTitleText = scan.items[job.topicIndex]?.fileTitle || "";
 
-        const built = await buildProbedStream(
-          job.rawUrl,
-          job.sourceUrl || tabUrl,
-          job.subtitles,
+        const built = await resolveProbeJobStream(
+          job,
           slotRuleId,
           `${topicTitleText} ${scan.title || ""}`,
-          tabId,
         );
 
         if (!built && !job.documents) {
@@ -1987,9 +2284,10 @@ async function probeTrackTopicsInTab(
           const rawUrl =
             safeMediaUrl(stream?.mediaUrl) || safeMediaUrl(stream?.url) || "";
 
+          const embedUrl = normalizeEmbedPlayerUrl(stream?.embedUrl) || "";
           const documents = validatedDocumentsRecord(stream?.documents);
 
-          if (!rawUrl && documents) {
+          if (!rawUrl && !embedUrl && documents) {
             const linkedTitle =
               typeof stream?.linkedTitle === "string" ? stream.linkedTitle : "";
 
@@ -2017,7 +2315,7 @@ async function probeTrackTopicsInTab(
             return;
           }
 
-          if (!rawUrl) {
+          if (!rawUrl && !embedUrl) {
             if (!partial) incrementCheckedTopicCount(scanId).catch(() => {});
 
             return;
@@ -2026,6 +2324,7 @@ async function probeTrackTopicsInTab(
           inspectionQueue.push({
             topicIndex,
             rawUrl,
+            ...(embedUrl ? { embedUrl } : {}),
             subtitles: Array.isArray(stream?.subtitles) ? stream.subtitles : [],
             linkedTitle:
               typeof stream?.linkedTitle === "string" ? stream.linkedTitle : "",
@@ -2197,11 +2496,12 @@ async function seedCurrentTopicFromTab(
     ...rawPageTracks.filter(isPresent),
   ]);
 
-  const domDocuments = activeStream.documents
-    ? undefined
-    : await extractFrameDocuments(sourceTabId);
+  const domDocuments = await extractFrameDocuments(sourceTabId);
 
-  const documents = activeStream.documents || domDocuments;
+  const documents = mergeTopicCompanionDocuments(
+    mergeTopicCompanionDocuments(activeStream.documents, sourceState.documents),
+    domDocuments,
+  );
 
   const hasLinkedPosts = Boolean(
     documents?.markdown &&
@@ -5792,9 +6092,16 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
 
           await enqueueDetection(() => synchronizePageState(tabId, pageUrl));
 
-          const [state, stored] = await Promise.all([
+          const [state, stored, domDocumentsResponse] = await Promise.all([
             refreshStoredQualityOptions(tabId),
             chrome.storage.session.get(outlineKey(tabId)),
+            chrome.tabs
+              .sendMessage(
+                tabId,
+                { type: "extract-topic-documents" },
+                { frameId: 0 },
+              )
+              .catch(() => null),
           ]);
 
           const pageTracks = await collectActiveTabSubtitles(
@@ -5804,9 +6111,19 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
             state.subtitles,
           );
 
+          const domDocuments = validatedDocumentsRecord(
+            externalRecord(domDocumentsResponse)?.documents,
+          );
+
+          const mergedDocuments = mergeTopicCompanionDocuments(
+            state.documents,
+            domDocuments,
+          );
+
           return {
             ...state,
             subtitles: uniqueSubtitles([...state.subtitles, ...pageTracks]),
+            ...(mergedDocuments ? { documents: mergedDocuments } : {}),
             trackOutline: stored[outlineKey(tabId)] || null,
           };
         })
@@ -5869,10 +6186,18 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
         return false;
       }
 
+      const documents = validatedDocumentsRecord(
+        externalRecord(message.download)?.documents,
+      );
+
+      const storedDownload = documents
+        ? Object.freeze({ ...download, documents })
+        : download;
+
       const downloadRequestId = crypto.randomUUID();
 
       chrome.storage.session
-        .set({ [`download-request:${downloadRequestId}`]: download })
+        .set({ [`download-request:${downloadRequestId}`]: storedDownload })
         .then(async () => {
           await authorizeDownloadMedia(download);
 
@@ -6026,6 +6351,46 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
         SLIDES_FRAME_PREFIX,
         (rawUrl) => Boolean(safeMediaUrl(rawUrl)),
       );
+    },
+    "page-topic-documents"(message, sender, sendResponse) {
+      const tabId = sender.tab?.id;
+
+      if (
+        !validTabId(tabId) ||
+        !isTrustedTrackFrameSender(sender, chrome.runtime.id)
+      ) {
+        return false;
+      }
+
+      const documents = validatedDocumentsRecord(message.documents);
+
+      if (!documents) {
+        sendResponse({ ok: false });
+
+        return false;
+      }
+
+      const pageUrl =
+        safeMediaUrl(message.sourceUrl) ||
+        (typeof sender.url === "string" ? sender.url : "");
+
+      enqueueDetection(async () => {
+        const state = await synchronizePageState(tabId, pageUrl);
+
+        const mergedDocuments = mergeTopicCompanionDocuments(
+          state.documents,
+          documents,
+        );
+
+        await setState(tabId, {
+          ...state,
+          ...(mergedDocuments ? { documents: mergedDocuments } : {}),
+        });
+      })
+        .then(() => sendResponse({ ok: true }))
+        .catch(() => sendResponse({ ok: false }));
+
+      return true;
     },
     "page-track-stream"(message, sender, sendResponse) {
       const tabId = sender.tab?.id;
