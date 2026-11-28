@@ -6,13 +6,13 @@ New or changed test names should start with `should` and describe one observable
 
 ## Test layers
 
-| Layer       | Command                    | What it proves                                                                                               |
-| ----------- | -------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Unit        | `npm run test:unit`        | Checks individual `lib/` and `src/` behaviours. Some tests supply mock browser objects or request functions. |
-| Integration | `npm run test:integration` | Several modules work together with a local server and mocked Chrome APIs.                                    |
+| Layer       | Command                    | What it proves                                                                                                                  |
+| ----------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Unit        | `npm run test:unit`        | Checks individual `lib/` and `src/` behaviours. Some tests supply mock browser objects or request functions.                    |
+| Integration | `npm run test:integration` | Several modules work together with a local server and mocked Chrome APIs.                                                       |
 | Contract    | `npm run test:contract`    | Built files, manifest entries, HTML pages, documentation limits, security expectations, and Copilot hook behavior remain valid. |
-| Browser     | `npm run test:e2e`         | A real Chromium extension flow works with Playwright.                                                        |
-| Mutation    | `npm run test:mutation`    | Tests detect intentional small code changes, such as a reversed condition.                                   |
+| Browser     | `npm run test:e2e`         | A real Chromium extension flow works with Playwright.                                                                           |
+| Mutation    | `npm run test:mutation`    | Tests detect intentional small code changes, such as a reversed condition.                                                      |
 
 The test pyramid keeps most tests fast at the unit layer. Integration and browser tests cover the connections that unit tests cannot observe. Mutation testing checks whether the tests would catch common implementation mistakes.
 
@@ -68,7 +68,7 @@ These practices follow the legacy-code workflow of first creating a seam, then w
 
 ## Code quality rules
 
-The project uses strict TypeScript, immutable values where practical, small focused functions, and named domain types. Code should state the product concept it handles instead of using generic names such as `data`, `value`, or `result` when a more specific name exists.
+The project uses strict TypeScript, immutable values where practical, small focused functions, and named domain types. Code should state the product concept it handles with full, unabbreviated names instead of generic names (`data`, `value`, `result`) or cryptic abbreviations (`ch`, `ext`, `ff`, `msg`, `res`).
 
 ESLint limits branching complexity. jscpd detects copied production code. knip finds unused files, exports, types, and packages. These checks protect maintainers from hidden coupling and code that has no active owner.
 

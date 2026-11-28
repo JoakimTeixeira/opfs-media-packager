@@ -4915,7 +4915,8 @@ async function runExcalidrawSvgExport(): Promise<
       document.querySelectorAll<HTMLButtonElement>(
         'button[type="submit"], button',
       ),
-    ).find((btn) => /join as a guest/i.test(btn.textContent || "")) || null;
+    ).find((button) => /join as a guest/i.test(button.textContent || "")) ||
+    null;
 
   const findMenuTrigger = (): HTMLElement | null =>
     document.querySelector<HTMLElement>('[data-testid="main-menu-trigger"]');
@@ -5015,13 +5016,13 @@ async function runExcalidrawSvgExport(): Promise<
     };
   };
 
-  URL.createObjectURL = (obj: Blob | MediaSource): string => {
-    const url = origCreateObjectUrl(obj);
+  URL.createObjectURL = (resource: Blob | MediaSource): string => {
+    const url = origCreateObjectUrl(resource);
 
-    if (obj instanceof Blob) {
-      capturedBlobs.set(url, obj);
+    if (resource instanceof Blob) {
+      capturedBlobs.set(url, resource);
 
-      obj
+      resource
         .text()
         .then(recordSvg)
         .catch(() => {});

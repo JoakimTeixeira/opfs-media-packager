@@ -10,22 +10,22 @@ export async function generateTinyTsSegment(
       chrome.runtime.getURL("vendor/ffmpeg/classes.js")
     )) as {
       FFmpeg: new () => {
-        load(cfg: Record<string, string>): Promise<void>;
+        load(config: Record<string, string>): Promise<void>;
         exec(args: string[]): Promise<number>;
         readFile(path: string): Promise<Uint8Array>;
         terminate(): void;
       };
     };
 
-    const ff = new FFmpeg();
+    const ffmpeg = new FFmpeg();
 
-    await ff.load({
+    await ffmpeg.load({
       classWorkerURL: chrome.runtime.getURL("vendor/ffmpeg/worker.js"),
       coreURL: chrome.runtime.getURL("vendor/ffmpeg/ffmpeg-core.js"),
       wasmURL: chrome.runtime.getURL("vendor/ffmpeg/ffmpeg-core.wasm"),
     });
 
-    const code = await ff.exec([
+    const code = await ffmpeg.exec([
       "-f",
       "lavfi",
       "-i",
@@ -51,9 +51,9 @@ export async function generateTinyTsSegment(
     ]);
 
     if (code !== 0) throw new Error(`FFmpeg fixture failed: ${code}`);
-    const bytes = await ff.readFile("tiny.ts");
+    const bytes = await ffmpeg.readFile("tiny.ts");
 
-    ff.terminate();
+    ffmpeg.terminate();
 
     return btoa(String.fromCharCode(...bytes));
   }, withAudio);

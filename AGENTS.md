@@ -24,7 +24,8 @@ OPFS Media Packager is a local-first Chrome Manifest V3 extension for saving aut
 ## Engineering conventions
 
 - Use strict TypeScript and the existing Vitest, ESLint, HTMLHint, and Prettier configurations.
-- Name tests for observable behavior and add or update coverage for behavior changes.
+- Use full, unabbreviated domain names for identifiers and types (for example, `character`, `extension`, `mimeType`, `ffmpeg`, and explicit document kinds such as `pdf`, `pptx`, `docx`, `xlsx`, `md`); avoid cryptic abbreviations such as `ch`, `ext`, `ff`, `msg`, or `res`.
+- Name tests for observable behavior, keep test examples anonymized and written in English (except when exercising specific localized UI tokens), and add or update coverage for behavior changes.
 - Prefer focused changes within the module that owns the behavior. Preserve public APIs unless a requested behavior requires a change.
 - Keep documentation aligned with the implementation and link to existing guidance instead of copying it.
 - Do not weaken, skip, or remove checks to make verification pass.

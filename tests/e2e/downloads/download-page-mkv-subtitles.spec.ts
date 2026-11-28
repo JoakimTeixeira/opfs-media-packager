@@ -109,21 +109,21 @@ test("should save an MKV containing decodable audio, video, and a default subtit
             };
           };
 
-          const ff = new FFmpeg();
+          const ffmpeg = new FFmpeg();
           const messages: string[] = [];
 
-          ff.on("log", ({ message }) => messages.push(message));
+          ffmpeg.on("log", ({ message }) => messages.push(message));
 
           try {
-            await ff.load({
+            await ffmpeg.load({
               classWorkerURL: chrome.runtime.getURL("vendor/ffmpeg/worker.js"),
               coreURL: chrome.runtime.getURL("vendor/ffmpeg/ffmpeg-core.js"),
               wasmURL: chrome.runtime.getURL("vendor/ffmpeg/ffmpeg-core.wasm"),
             });
 
-            await ff.writeFile("input.mkv", new Uint8Array(data));
+            await ffmpeg.writeFile("input.mkv", new Uint8Array(data));
 
-            const video = await ff.exec([
+            const video = await ffmpeg.exec([
               "-i",
               "input.mkv",
               "-map",
@@ -133,7 +133,7 @@ test("should save an MKV containing decodable audio, video, and a default subtit
               "-",
             ]);
 
-            const audio = await ff.exec([
+            const audio = await ffmpeg.exec([
               "-i",
               "input.mkv",
               "-map",
@@ -143,7 +143,7 @@ test("should save an MKV containing decodable audio, video, and a default subtit
               "-",
             ]);
 
-            const subtitle = await ff.exec([
+            const subtitle = await ffmpeg.exec([
               "-i",
               "input.mkv",
               "-map",
@@ -152,7 +152,7 @@ test("should save an MKV containing decodable audio, video, and a default subtit
             ]);
 
             const text = new TextDecoder().decode(
-              await ff.readFile("subtitle.vtt"),
+              await ffmpeg.readFile("subtitle.vtt"),
             );
 
             return {
@@ -165,7 +165,7 @@ test("should save an MKV containing decodable audio, video, and a default subtit
               ),
             };
           } finally {
-            ff.terminate();
+            ffmpeg.terminate();
           }
         },
         [...bytes],
