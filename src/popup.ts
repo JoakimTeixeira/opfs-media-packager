@@ -1,4 +1,4 @@
-import type { PlaylistOutline } from "../lib/playlist/playlist-plan.ts";
+import type { TrackOutline } from "../lib/track/track-plan.ts";
 import {
   DEFAULT_OUTPUT_FORMAT,
   OUTPUT_FORMAT_OPTIONS,
@@ -27,7 +27,7 @@ interface DetectedStream {
 interface PopupState {
   readonly streams?: readonly DetectedStream[];
   readonly subtitles?: readonly SubtitleTrackCandidate[];
-  readonly playlistOutline?: PlaylistOutline | null;
+  readonly trackOutline?: TrackOutline | null;
   readonly preferredOutput?: string;
   readonly preferredQualityLabel: string;
 }
@@ -95,21 +95,21 @@ function preferredQualityIndex(
 function render(state: PopupState): void {
   list.replaceChildren();
   const streams = uniqueStreams(state.streams || []);
-  const playlistDetected = Boolean(state.playlistOutline?.items?.length);
+  const trackDetected = Boolean(state.trackOutline?.items?.length);
 
-  if (playlistDetected && state.playlistOutline) {
-    const playlistOutline = state.playlistOutline;
-    const playlist = document.createElement("article");
+  if (trackDetected && state.trackOutline) {
+    const trackOutline = state.trackOutline;
+    const trackCard = document.createElement("article");
 
-    playlist.className = "playlist";
+    trackCard.className = "track-card";
     const copy = document.createElement("div");
 
     copy.append(
-      node("div", playlistOutline.title, "playlist-title"),
+      node("div", trackOutline.title, "track-title"),
       node(
         "div",
-        `${playlistOutline.items.length} items ready to scan`,
-        "playlist-copy",
+        `${trackOutline.items.length} topics ready to scan`,
+        "track-copy",
       ),
     );
 
@@ -122,8 +122,8 @@ function render(state: PopupState): void {
 
       const result = (await chrome.runtime
         .sendMessage({
-          type: "start-playlist-scan",
-          outline: playlistOutline,
+          type: "start-track-scan",
+          outline: trackOutline,
           sourceTabId: tabId,
         })
         .catch(() => ({ ok: false }))) as
@@ -138,7 +138,7 @@ function render(state: PopupState): void {
         );
 
         announce(
-          "The playlist scan could not start. Refresh the source page and try again.",
+          "The track scan could not start. Refresh the source page and try again.",
         );
 
         return;
@@ -147,12 +147,12 @@ function render(state: PopupState): void {
       window.close();
     });
 
-    playlist.append(copy, scan);
-    list.append(playlist);
+    trackCard.append(copy, scan);
+    list.append(trackCard);
   }
 
   if (!streams.length) {
-    if (!playlistDetected) {
+    if (!trackDetected) {
       list.append(
         node("p", "No HLS manifest detected in this tab yet.", "empty"),
       );
@@ -161,7 +161,7 @@ function render(state: PopupState): void {
     return;
   }
 
-  const streamList = playlistDetected ? document.createElement("div") : list;
+  const streamList = trackDetected ? document.createElement("div") : list;
 
   streams.forEach((stream) => {
     const row = document.createElement("article");
@@ -313,7 +313,7 @@ function render(state: PopupState): void {
     streamList.append(row);
   });
 
-  if (playlistDetected) {
+  if (trackDetected) {
     const currentStreams = document.createElement("details");
 
     currentStreams.className = "current-streams";
@@ -373,7 +373,7 @@ window.addEventListener("unhandledrejection", () =>
 
 if (tabId) {
   await chrome.tabs
-    .sendMessage(tabId, { type: "collect-playlist-outline" })
+    .sendMessage(tabId, { type: "collect-track-outline" })
     .catch(() => {});
 
   await refreshPopup().catch(() =>

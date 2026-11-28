@@ -120,19 +120,19 @@ test("should ship bundled popup, downloader, and course scripts with no bare mod
 
   const popupHtml = await readFile(new URL("src/popup.html", root), "utf8");
   const indexHtml = await readFile(new URL("src/index.html", root), "utf8");
-  const courseHtml = await readFile(new URL("src/playlist.html", root), "utf8");
+  const courseHtml = await readFile(new URL("src/track.html", root), "utf8");
 
   assert.strictEqual(manifest.action.default_popup, "src/popup.html");
   assert.strictEqual(manifest.background.service_worker, "dist/background.js");
   assert.deepStrictEqual(manifest.content_scripts[0]?.js, ["dist/content.js"]);
 
   assert.deepStrictEqual(manifest.content_scripts[1]?.js, [
-    "dist/page-playlist-probe.js",
+    "dist/page-track-probe.js",
   ]);
 
   assert.match(popupHtml, /src="\.\.\/dist\/popup\.js"/);
   assert.match(indexHtml, /src="\.\.\/dist\/app\.js"/);
-  assert.match(courseHtml, /src="\.\.\/dist\/playlist\.js"/);
+  assert.match(courseHtml, /src="\.\.\/dist\/track\.js"/);
 
   const popupBundle = await readFile(new URL("dist/popup.js", root), "utf8");
   const appBundle = await readFile(new URL("dist/app.js", root), "utf8");
@@ -175,7 +175,7 @@ test("should keep course scanning headless without main-window tab fallbacks or 
   const content = await readFile(new URL("src/content.ts", root), "utf8");
 
   const courseProbe = await readFile(
-    new URL("src/page-playlist-probe.ts", root),
+    new URL("src/page-track-probe.ts", root),
     "utf8",
   );
 
@@ -188,7 +188,12 @@ test("should keep course scanning headless without main-window tab fallbacks or 
   assert.ok(manifest.content_scripts[0]?.all_frames);
   assert.ok(manifest.content_scripts[1]?.all_frames);
   assert.strictEqual(manifest.content_scripts[1]?.world, "MAIN");
-  assert.strictEqual(manifest.content_scripts[1]?.matches[0], "https://*/courses/*");
+
+  assert.strictEqual(
+    manifest.content_scripts[1]?.matches[0],
+    "https://*/courses/*",
+  );
+
   assert.strictEqual(manifest.web_accessible_resources, undefined);
 
   // Tier 1 + Tier 1.5 hidden iframe + Tier 2 minimized popup contracts
@@ -208,7 +213,7 @@ test("should keep course scanning headless without main-window tab fallbacks or 
   assert.match(content, /hidden-probe-frame-ready/);
   assert.match(content, /close-hidden-probe-frame/);
   assert.match(courseProbe, /__opfsMediaPackagerProbeLoaded/);
-  assert.match(courseProbe, /fetchApiPlaylistWithBackoff/);
+  assert.match(courseProbe, /fetchApiTrackWithBackoff/);
   assert.match(courseProbe, /DecompressionStream\("deflate"\)/);
   assert.notMatch(courseProbe, /JSON\.parse =/);
 });

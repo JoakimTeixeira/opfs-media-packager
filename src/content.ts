@@ -1,19 +1,19 @@
 import {
-  playlistRootFolderName,
-  normalizeItemTitleKey,
-  type PlaylistOutline,
-  type UsablePlaylistItem as PlaylistOutlineItem,
-} from "../lib/playlist/playlist-plan.ts";
+  trackRootFolderName,
+  normalizeTopicTitleKey,
+  type TrackOutline,
+  type UsableTrackTopic as TrackOutlineTopic,
+} from "../lib/track/track-plan.ts";
 import {
   activeStorageBlobUrl,
-  countItemCompanionDocuments,
-  extractItemCompanionDocumentsFromLinksAndHtml,
+  countTopicCompanionDocuments,
+  extractTopicCompanionDocumentsFromLinksAndHtml,
   isExcalidrawUrl,
   isSlidesDeckUrl,
   normalizeEmbeddedVideoUrl,
   type EmbeddedVideoLink,
-  type ItemCompanionDocuments,
-} from "../lib/materials/item-assets.ts";
+  type TopicCompanionDocuments,
+} from "../lib/materials/topic-assets.ts";
 import { scoreLinkedVideoUrl } from "../lib/materials/linked-video.ts";
 import { isDirectVideoUrl } from "../lib/media/stream-identity.ts";
 import {
@@ -21,7 +21,7 @@ import {
   isSubtitleResourceUrl,
 } from "../lib/subtitles/subtitle-tracks.ts";
 
-interface PendingPlaylistProbe {
+interface PendingTrackProbe {
   readonly ackTimer: ReturnType<typeof setTimeout>;
   ackDone: boolean;
   readonly sendResponse: (response: unknown) => void;
@@ -33,7 +33,7 @@ interface PageSubtitleTrack {
   readonly label: string;
 }
 
-interface ButtonSidebarItem {
+interface ButtonSidebarTopic {
   readonly id: string;
   readonly url: string;
   readonly title: string;
@@ -41,7 +41,7 @@ interface ButtonSidebarItem {
   readonly navigationIndex: number;
 }
 
-interface SidebarItemEntry {
+interface SidebarTopicEntry {
   readonly id: string;
   readonly url: string;
   readonly title: string;
@@ -80,9 +80,9 @@ interface RuntimeMessage {
   readonly requestId?: unknown;
   readonly items?: unknown;
   readonly responseType?: unknown;
-  readonly itemIndex?: unknown;
-  readonly itemTitle?: unknown;
-  readonly itemSection?: unknown;
+  readonly topicIndex?: unknown;
+  readonly topicTitle?: unknown;
+  readonly topicSection?: unknown;
 }
 
 interface WindowBridgeMessage {
@@ -90,7 +90,7 @@ interface WindowBridgeMessage {
   readonly type?: unknown;
   readonly requestId?: unknown;
   readonly response?: unknown;
-  readonly itemIndex?: unknown;
+  readonly topicIndex?: unknown;
   readonly stream?: unknown;
   readonly partial?: unknown;
   readonly unresolvedIndices?: unknown;
@@ -116,7 +116,7 @@ const contentState = {
 };
 
 const pendingMediaFetches = new Set<string>();
-const pendingPlaylistProbes = new Map<string, PendingPlaylistProbe>();
+const pendingTrackProbes = new Map<string, PendingTrackProbe>();
 const hiddenProbeFrames = new Map<string, HTMLIFrameElement>();
 const hiddenProbePrefix = "opfs-media-packager-probe:";
 const hiddenOutlinePrefix = "opfs-media-packager-outline:";
@@ -162,9 +162,9 @@ const isHiddenHelperFrame = Boolean(
 );
 
 const offscreenOutlineState: {
-  inFlight: Promise<PlaylistOutline | null> | null;
+  inFlight: Promise<TrackOutline | null> | null;
   cachedUrl: string;
-  cachedOutline: PlaylistOutline | null;
+  cachedOutline: TrackOutline | null;
   attemptedUrls: Set<string>;
 } = {
   inFlight: null,
@@ -223,7 +223,7 @@ function currentPageHeading(): string {
   );
 }
 
-function handleProbePlaylistItemsMessage(
+function handleProbeTrackTopicsMessage(
   message: RuntimeMessage,
   sendResponse: (response: unknown) => void,
 ): boolean {
@@ -234,12 +234,12 @@ function handleProbePlaylistItemsMessage(
   }
 
   const ackTimer = setTimeout(() => {
-    if (!pendingPlaylistProbes.has(requestId)) return;
-    pendingPlaylistProbes.delete(requestId);
+    if (!pendingTrackProbes.has(requestId)) return;
+    pendingTrackProbes.delete(requestId);
     sendResponse({ ok: false, reason: "probe-not-ready" });
   }, 500);
 
-  pendingPlaylistProbes.set(requestId, {
+  pendingTrackProbes.set(requestId, {
     ackTimer,
     ackDone: false,
     sendResponse,
@@ -248,7 +248,7 @@ function handleProbePlaylistItemsMessage(
   window.postMessage(
     {
       source: "opfs-media-packager",
-      type: "probe-playlist-items",
+      type: "probe-track-topics",
       requestId,
       items: message.items,
     },
@@ -319,20 +319,20 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
 
       return false;
     },
-    "collect-playlist-outline"(_message, sendResponse) {
+    "collect-track-outline"(_message, sendResponse) {
       if (expandSidebarSections()) {
-        setTimeout(() => reportPlaylistOutline(true), 500);
+        setTimeout(() => reportTrackOutline(true), 500);
       }
 
       reportTracks(true);
 
-      Promise.resolve(reportPlaylistOutline(true)).finally(() =>
+      Promise.resolve(reportTrackOutline(true)).finally(() =>
         sendResponse({ ok: true }),
       );
 
       return true;
     },
-    "probe-playlist-items": handleProbePlaylistItemsMessage,
+    "probe-track-topics": handleProbeTrackTopicsMessage,
     "find-linked-video-in-page"(_message, sendResponse) {
       sendResponse(findLinkedVideoInPage());
 
@@ -343,8 +343,8 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
 
       return false;
     },
-    "extract-item-documents"(_message, sendResponse) {
-      sendResponse({ documents: extractItemCompanionDocumentsFromDom() });
+    "extract-topic-documents"(_message, sendResponse) {
+      sendResponse({ documents: extractTopicCompanionDocumentsFromDom() });
 
       return false;
     },
@@ -353,24 +353,24 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
 
       return false;
     },
-    "navigate-playlist-sidebar"(message, sendResponse) {
-      const itemIndex =
-        typeof message.itemIndex === "number" ? message.itemIndex : undefined;
+    "navigate-track-sidebar"(message, sendResponse) {
+      const topicIndex =
+        typeof message.topicIndex === "number" ? message.topicIndex : undefined;
 
       const validIndex =
-        typeof itemIndex === "number" &&
-        Number.isInteger(itemIndex) &&
-        itemIndex >= 0;
+        typeof topicIndex === "number" &&
+        Number.isInteger(topicIndex) &&
+        topicIndex >= 0;
 
-      const itemTitleText =
-        typeof message.itemTitle === "string" ? message.itemTitle : "";
+      const topicTitleText =
+        typeof message.topicTitle === "string" ? message.topicTitle : "";
 
-      const itemSectionText =
-        typeof message.itemSection === "string" ? message.itemSection : "";
+      const topicSectionText =
+        typeof message.topicSection === "string" ? message.topicSection : "";
 
-      if (!validIndex && typeof message.itemTitle !== "string") return false;
+      if (!validIndex && typeof message.topicTitle !== "string") return false;
 
-      clickSidebarItem(itemIndex, itemTitleText, itemSectionText)
+      clickSidebarTopic(topicIndex, topicTitleText, topicSectionText)
         .then((result) => sendResponse(result))
         .catch(() => sendResponse({ ok: false }));
 
@@ -419,44 +419,44 @@ const windowMessageHandlers: Readonly<
       })
       .catch(() => {});
   },
-  "probe-playlist-items-ack"(data) {
+  "probe-track-topics-ack"(data) {
     if (typeof data.requestId !== "string") return;
-    const pending = pendingPlaylistProbes.get(data.requestId);
+    const pending = pendingTrackProbes.get(data.requestId);
 
     if (!pending || pending.ackDone) return;
     pending.ackDone = true;
     clearTimeout(pending.ackTimer);
     pending.sendResponse({ ok: true });
   },
-  "playlist-item-probed"(data) {
+  "track-topic-probed"(data) {
     if (
       typeof data.requestId !== "string" ||
-      !pendingPlaylistProbes.has(data.requestId)
+      !pendingTrackProbes.has(data.requestId)
     ) {
       return;
     }
 
     chrome.runtime
       .sendMessage({
-        type: "playlist-item-probed",
+        type: "track-topic-probed",
         requestId: data.requestId,
-        itemIndex: data.itemIndex,
+        topicIndex: data.topicIndex,
         stream: data.stream || null,
         partial: data.partial === true,
       })
       .catch(() => {});
   },
-  "playlist-items-probe-done"(data) {
+  "track-topics-probe-done"(data) {
     if (
       typeof data.requestId !== "string" ||
-      !pendingPlaylistProbes.delete(data.requestId)
+      !pendingTrackProbes.delete(data.requestId)
     ) {
       return;
     }
 
     chrome.runtime
       .sendMessage({
-        type: "playlist-items-probe-done",
+        type: "track-topics-probe-done",
         requestId: data.requestId,
         unresolvedIndices: Array.isArray(data.unresolvedIndices)
           ? data.unresolvedIndices
@@ -474,9 +474,9 @@ const windowMessageHandlers: Readonly<
       })
       .catch(() => {});
   },
-  "playlist-stream"(data) {
+  "track-stream"(data) {
     chrome.runtime
-      .sendMessage({ type: "page-playlist-stream", stream: data.stream })
+      .sendMessage({ type: "page-track-stream", stream: data.stream })
       .catch(() => {});
   },
   "page-subtitle-tracks"(data) {
@@ -520,7 +520,7 @@ function chapterTitle(chapter: Element): string {
   return cleanText(heading?.textContent || "Section");
 }
 
-function itemUrl(item: Element, currentUrl: URL): string {
+function topicUrl(item: Element, currentUrl: URL): string {
   const link =
     item.closest<HTMLAnchorElement>("a[href]") ||
     item.querySelector<HTMLAnchorElement>("a[href]");
@@ -550,10 +550,10 @@ function itemUrl(item: Element, currentUrl: URL): string {
   return url.href;
 }
 
-const ITEM_BADGE_PATTERN =
+const TOPIC_BADGE_PATTERN =
   /^(?:aula|lesson|v[ií]deo|video|sess[aã]o|session|epis[oó]dio|episode|cap[ií]tulo|chapter|encontro|workshop|palestra|talk|live|conte[uú]do|content|conclu[ií]d[oa]s?|completed|em\s+andamento|in\s+progress)$/i;
 
-const ITEM_BADGE_SUFFIX_PATTERN =
+const TOPIC_BADGE_SUFFIX_PATTERN =
   /\b(?:aula|item|v[ií]deo|video|sess[aã]o|session|epis[oó]dio|episode|cap[ií]tulo|chapter|encontro|workshop|palestra|talk|live|conclu[ií]d[oa]s?|completed)\s*$/i;
 
 const SECTION_COUNT_PATTERN =
@@ -615,32 +615,34 @@ function elementTextLines(element: Element): string[] {
   return [];
 }
 
-function itemTitle(item: Element): string {
+function topicTitle(item: Element): string {
   const lines = elementTextLines(item);
 
   const title =
     lines.find(
       (line) =>
         !/^\d{1,2}:\d{2}(?::\d{2})?$/.test(line) &&
-        !ITEM_BADGE_PATTERN.test(line),
-    ) || "Item";
+        !TOPIC_BADGE_PATTERN.test(line),
+    ) || "Topic";
 
   // A duration can share a line with the title when the page uses inline text.
-  return cleanText(title.replace(/\s*\d{1,2}:\d{2}(?::\d{2})?$/, "")) || "Item";
+  return (
+    cleanText(title.replace(/\s*\d{1,2}:\d{2}(?::\d{2})?$/, "")) || "Topic"
+  );
 }
 
 /**
  * Creates one playlist item from a page item when it has a usable item id
  * and destination URL.
  */
-function outlineItem(
+function outlineTopic(
   item: Element,
   currentUrl: URL,
   fileTitle: string,
   folderPath: readonly string[],
-): PlaylistOutlineItem | null {
+): TrackOutlineTopic | null {
   const idMatch = /^list-content-(\d+)$/.exec(item.id);
-  const url = itemUrl(item, currentUrl);
+  const url = topicUrl(item, currentUrl);
 
   if (!idMatch || !url) return null;
 
@@ -652,7 +654,7 @@ function fallbackSectionTitle(item: Element): string {
   const previous = list?.previousElementSibling;
   const heading = previous?.querySelector("h1, h2, h3, h4, [role=button]");
 
-  return cleanText(heading?.textContent || previous?.textContent || "Items");
+  return cleanText(heading?.textContent || previous?.textContent || "Topics");
 }
 
 function ancestorChainWithin(
@@ -677,7 +679,7 @@ function sectionHeadingFromCardHeader(sibling: Element): string {
     lines.find(
       (line) =>
         !SECTION_COUNT_PATTERN.test(line) &&
-        !ITEM_BADGE_PATTERN.test(line) &&
+        !TOPIC_BADGE_PATTERN.test(line) &&
         isSectionHeadingText(line),
     ) || ""
   );
@@ -710,17 +712,17 @@ function sidebarSectionTitle(item: Element): string {
     const lineHeading = elementTextLines(container).find(
       (line) =>
         isSectionHeadingText(line) &&
-        !ITEM_BADGE_PATTERN.test(line) &&
-        !ITEM_BADGE_SUFFIX_PATTERN.test(line),
+        !TOPIC_BADGE_PATTERN.test(line) &&
+        !TOPIC_BADGE_SUFFIX_PATTERN.test(line),
     );
 
     if (lineHeading) return lineHeading;
   }
 
-  return "Items";
+  return "Topics";
 }
 
-function serializedSidebarItemUrls(current: URL): string[] {
+function serializedSidebarTopicUrls(current: URL): string[] {
   const serializedPage = (document.documentElement?.innerHTML || "").replaceAll(
     "\\/",
     "/",
@@ -734,11 +736,11 @@ function serializedSidebarItemUrls(current: URL): string[] {
 
   for (const match of matches) urls.add(new URL(match[0], current).href);
 
-  const itemIds = serializedPage.matchAll(
+  const topicIds = serializedPage.matchAll(
     /["'](?:lesson(?:_|-)?id|content(?:_|-)?id)["']\s*:\s*["']([^"']+)["']/gi,
   );
 
-  for (const match of itemIds) {
+  for (const match of topicIds) {
     const path = current.pathname.replace(
       /(\/lessons\/)[^/]+/i,
       `$1${encodeURIComponent(match[1])}`,
@@ -780,7 +782,7 @@ function reportPageLocation(): void {
     .catch(() => {});
 }
 
-function isThumbnailItemRow(
+function isThumbnailTopicRow(
   element: Element,
   lines: readonly string[],
   last: string,
@@ -796,7 +798,7 @@ function isThumbnailItemRow(
   );
 }
 
-function isSidebarItemElement(element: Element): boolean {
+function isSidebarTopicElement(element: Element): boolean {
   if (element.closest("header")) return false;
   const lines = elementTextLines(element);
 
@@ -805,15 +807,15 @@ function isSidebarItemElement(element: Element): boolean {
 
     const hasTitle = lines.some(
       (line) =>
-        !ITEM_BADGE_PATTERN.test(line) &&
+        !TOPIC_BADGE_PATTERN.test(line) &&
         !SECTION_COUNT_PATTERN.test(line) &&
         !/^\d{1,2}:\d{2}(?::\d{2})?$/.test(line),
     );
 
     if (
       hasTitle &&
-      (ITEM_BADGE_PATTERN.test(last) ||
-        isThumbnailItemRow(element, lines, last))
+      (TOPIC_BADGE_PATTERN.test(last) ||
+        isThumbnailTopicRow(element, lines, last))
     ) {
       return true;
     }
@@ -822,30 +824,30 @@ function isSidebarItemElement(element: Element): boolean {
   const combined = cleanText(lines.join(" "));
 
   return (
-    ITEM_BADGE_SUFFIX_PATTERN.test(combined) &&
+    TOPIC_BADGE_SUFFIX_PATTERN.test(combined) &&
     !ACTION_BUTTON_PATTERN.test(combined) &&
     !SECTION_COUNT_PATTERN.test(combined) &&
     !/\b\d+\s+(?:aulas?|lessons?|sess[oõ]es?|sessions?)\s*$/i.test(combined) &&
-    !ITEM_BADGE_PATTERN.test(combined)
+    !TOPIC_BADGE_PATTERN.test(combined)
   );
 }
 
 /** Returns the item controls rendered by a sidebar-only playlist player. */
-function sidebarItemButtons(): Element[] {
+function sidebarTopicButtons(): Element[] {
   return [
     ...document.querySelectorAll("aside button, [role=complementary] button"),
-  ].filter((button) => isSidebarItemElement(button));
+  ].filter((button) => isSidebarTopicElement(button));
 }
 
-function normalizeItemKey(value: string): string {
-  return normalizeItemTitleKey(cleanText(value));
+function normalizeTopicKey(value: string): string {
+  return normalizeTopicTitleKey(cleanText(value));
 }
 
 function scorePageLinkedVideoUrl(rawHref: string): number {
   return scoreLinkedVideoUrl(rawHref, location.href);
 }
 
-function isOutsideItemBody(
+function isOutsideTopicBody(
   element: Element,
   commentsBoundary: Element | null,
 ): boolean {
@@ -871,7 +873,7 @@ function isOutsideItemBody(
   return false;
 }
 
-function findItemCommentsBoundary(root: Element): Element | null {
+function findTopicCommentsBoundary(root: Element): Element | null {
   return (
     [...root.querySelectorAll("[role=tab], h2, h3, h4, section")].find((el) =>
       /^(?:coment[áa]rios|comments)\b/i.test(cleanText(el.textContent || "")),
@@ -929,22 +931,22 @@ function fileCardName(card: Element, resolvedUrl: string): string {
   return filenameFromUrlPath(resolvedUrl) || cleanText(card.textContent || "");
 }
 
-interface DomItemImageInput {
+interface DomTopicImageInput {
   readonly url: string;
   readonly alt?: string;
   readonly filename?: string;
 }
 
-interface DomItemLinkInput {
+interface DomTopicLinkInput {
   readonly url: string;
   readonly text?: string;
 }
 
-function collectDomItemImages(
+function collectDomTopicImages(
   root: Element,
   commentsBoundary: Element | null,
-): DomItemImageInput[] {
-  const images: DomItemImageInput[] = [];
+): DomTopicImageInput[] {
+  const images: DomTopicImageInput[] = [];
 
   for (const img of root.querySelectorAll("img")) {
     if (
@@ -952,7 +954,7 @@ function collectDomItemImages(
       img.closest(
         '[data-testid="editor-content-blocks-file-card"], .node-embed, [data-testid*="embed" i], [class*="oembed" i], [data-component="VideoPlayer"], action-text-attachment[content-type*="video"], media-theme, media-controller, hls-video, mux-video, video',
       ) ||
-      isOutsideItemBody(img, commentsBoundary)
+      isOutsideTopicBody(img, commentsBoundary)
     ) {
       continue;
     }
@@ -986,10 +988,10 @@ function collectDomItemImages(
 function collectDomActionTextAttachments(
   root: Element,
   commentsBoundary: Element | null,
-  links: DomItemLinkInput[],
+  links: DomTopicLinkInput[],
 ): void {
   for (const attachment of root.querySelectorAll("action-text-attachment")) {
-    if (isOutsideItemBody(attachment, commentsBoundary)) continue;
+    if (isOutsideTopicBody(attachment, commentsBoundary)) continue;
     const url = resolveDomElementUrl(attachment.getAttribute("url") || "");
 
     if (!url) continue;
@@ -1009,16 +1011,16 @@ function collectDomActionTextAttachments(
   }
 }
 
-function collectDomItemFileCards(
+function collectDomTopicFileCards(
   root: Element,
   commentsBoundary: Element | null,
-  images: DomItemImageInput[],
-  links: DomItemLinkInput[],
+  images: DomTopicImageInput[],
+  links: DomTopicLinkInput[],
 ): void {
   for (const card of root.querySelectorAll(
     '[data-testid="editor-content-blocks-file-card"]',
   )) {
-    if (isOutsideItemBody(card, commentsBoundary)) continue;
+    if (isOutsideTopicBody(card, commentsBoundary)) continue;
 
     const preview = card.querySelector("img");
     const imgSrc = resolveDomElementUrl(preview?.getAttribute("src") || "");
@@ -1042,13 +1044,13 @@ function collectDomItemFileCards(
   }
 }
 
-function collectDomItemAnchors(
+function collectDomTopicAnchors(
   root: Element,
   commentsBoundary: Element | null,
-  links: DomItemLinkInput[],
+  links: DomTopicLinkInput[],
 ): void {
   for (const anchor of root.querySelectorAll("a[href]")) {
-    if (isOutsideItemBody(anchor, commentsBoundary)) continue;
+    if (isOutsideTopicBody(anchor, commentsBoundary)) continue;
 
     const url = resolveDomElementUrl(anchor.getAttribute("href") || "");
 
@@ -1060,7 +1062,7 @@ function collectDomItemAnchors(
 
 function classifyDomIframe(
   iframe: Element,
-  links: DomItemLinkInput[],
+  links: DomTopicLinkInput[],
   seenSrc: Set<string>,
 ): EmbeddedVideoLink | null {
   const src = resolveDomElementUrl(iframe.getAttribute("src") || "");
@@ -1096,10 +1098,10 @@ function classifyDomIframe(
   });
 }
 
-function collectDomItemIframes(
+function collectDomTopicIframes(
   roots: readonly Element[],
   commentsBoundary: Element | null,
-  links: DomItemLinkInput[],
+  links: DomTopicLinkInput[],
 ): EmbeddedVideoLink | null {
   const seenSrc = new Set<string>();
 
@@ -1109,7 +1111,7 @@ function collectDomItemIframes(
 
   for (const scope of roots) {
     for (const iframe of scope.querySelectorAll("iframe[src]")) {
-      if (isOutsideItemBody(iframe, commentsBoundary)) continue;
+      if (isOutsideTopicBody(iframe, commentsBoundary)) continue;
       const candidate = classifyDomIframe(iframe, links, seenSrc);
 
       if (candidate && !holder.embeddedVideo) {
@@ -1121,7 +1123,7 @@ function collectDomItemIframes(
   return holder.embeddedVideo;
 }
 
-function extractItemCompanionDocumentsFromDom(): ItemCompanionDocuments | null {
+function extractTopicCompanionDocumentsFromDom(): TopicCompanionDocuments | null {
   const editorRoot = document.querySelector(
     '[data-testid="tip-tap-editor-content"] [data-circle="rich-text-content"], [data-testid="tip-tap-editor-content"], [data-circle="event-body"], [data-testid="post-body"], article .ProseMirror, main .ProseMirror, main .trix-content, article .trix-content',
   );
@@ -1129,19 +1131,19 @@ function extractItemCompanionDocumentsFromDom(): ItemCompanionDocuments | null {
   const mainRoot = document.querySelector("main, [role=main]");
   const primaryRoot = editorRoot || mainRoot;
 
-  if (!primaryRoot || isOutsideItemBody(primaryRoot, null)) return null;
+  if (!primaryRoot || isOutsideTopicBody(primaryRoot, null)) return null;
 
-  const commentsBoundary = findItemCommentsBoundary(mainRoot || primaryRoot);
+  const commentsBoundary = findTopicCommentsBoundary(mainRoot || primaryRoot);
 
   const images = editorRoot
-    ? collectDomItemImages(editorRoot, commentsBoundary)
+    ? collectDomTopicImages(editorRoot, commentsBoundary)
     : [];
 
-  const links: DomItemLinkInput[] = [];
+  const links: DomTopicLinkInput[] = [];
 
   if (editorRoot) {
-    collectDomItemFileCards(editorRoot, commentsBoundary, images, links);
-    collectDomItemAnchors(editorRoot, commentsBoundary, links);
+    collectDomTopicFileCards(editorRoot, commentsBoundary, images, links);
+    collectDomTopicAnchors(editorRoot, commentsBoundary, links);
     collectDomActionTextAttachments(editorRoot, commentsBoundary, links);
   }
 
@@ -1150,7 +1152,7 @@ function extractItemCompanionDocumentsFromDom(): ItemCompanionDocuments | null {
     ...(mainRoot && mainRoot !== editorRoot ? [mainRoot] : []),
   ];
 
-  const embeddedVideo = collectDomItemIframes(
+  const embeddedVideo = collectDomTopicIframes(
     iframeScopes,
     commentsBoundary,
     links,
@@ -1158,7 +1160,7 @@ function extractItemCompanionDocumentsFromDom(): ItemCompanionDocuments | null {
 
   if (!editorRoot && !embeddedVideo && !links.length) return null;
 
-  const documents = extractItemCompanionDocumentsFromLinksAndHtml({
+  const documents = extractTopicCompanionDocumentsFromLinksAndHtml({
     title: currentPageHeading(),
     pageUrl: location.href,
     html: editorRoot ? editorRoot.innerHTML : "",
@@ -1167,21 +1169,21 @@ function extractItemCompanionDocumentsFromDom(): ItemCompanionDocuments | null {
     embeddedVideo,
   });
 
-  return countItemCompanionDocuments(documents) ? documents : null;
+  return countTopicCompanionDocuments(documents) ? documents : null;
 }
 
 function collectDomDirectVideoUrl(): string {
   const root = document.querySelector("main, [role=main]") || document.body;
 
   if (!root) return "";
-  const commentsBoundary = findItemCommentsBoundary(root);
+  const commentsBoundary = findTopicCommentsBoundary(root);
 
   const elements = root.querySelectorAll(
     "media-theme[downloadurl], video source[src], video[src]",
   );
 
   for (const element of elements) {
-    if (isOutsideItemBody(element, commentsBoundary)) continue;
+    if (isOutsideTopicBody(element, commentsBoundary)) continue;
 
     const rawAttr = element.matches("media-theme")
       ? element.getAttribute("downloadurl") || ""
@@ -1205,11 +1207,11 @@ function findLinkedVideoInPage(): LinkedVideoResult {
 
   if (!root) return { ok: false };
 
-  const commentsBoundary = findItemCommentsBoundary(root);
+  const commentsBoundary = findTopicCommentsBoundary(root);
 
   // 1. Embedded video iframe inside the item body.
   for (const iframe of root.querySelectorAll("iframe[src]")) {
-    if (isOutsideItemBody(iframe, commentsBoundary)) continue;
+    if (isOutsideTopicBody(iframe, commentsBoundary)) continue;
     const src = iframe.getAttribute("src") || "";
 
     if (scorePageLinkedVideoUrl(src) >= 30) {
@@ -1219,7 +1221,7 @@ function findLinkedVideoInPage(): LinkedVideoResult {
 
   // 2. Highest-scoring video/community link inside the item body.
   const bestLink = [...root.querySelectorAll("a[href], [data-href]")]
-    .filter((anchor) => !isOutsideItemBody(anchor, commentsBoundary))
+    .filter((anchor) => !isOutsideTopicBody(anchor, commentsBoundary))
     .map((anchor): LinkedVideoCandidate | null => {
       const raw =
         anchor.getAttribute("href") || anchor.getAttribute("data-href") || "";
@@ -1259,7 +1261,7 @@ function findLinkedVideoInPage(): LinkedVideoResult {
   //    playlist player renders internal post references as buttons without href.
   for (const button of root.querySelectorAll("button")) {
     if (
-      isOutsideItemBody(button, commentsBoundary) ||
+      isOutsideTopicBody(button, commentsBoundary) ||
       button.closest("[aria-label*='video' i], [aria-label*='player' i]")
     ) {
       continue;
@@ -1301,7 +1303,7 @@ function isActiveRowMatchingTarget(
 ): boolean {
   if (
     !activeRow ||
-    normalizeItemKey(itemTitle(activeRow)) !== normalizedTarget
+    normalizeTopicKey(topicTitle(activeRow)) !== normalizedTarget
   ) {
     return false;
   }
@@ -1309,12 +1311,14 @@ function isActiveRowMatchingTarget(
   if (!normalizedSection) return true;
 
   const hasSidebarCandidate = buttons.some(
-    (button) => normalizeItemKey(itemTitle(button)) === normalizedTarget,
+    (button) => normalizeTopicKey(topicTitle(button)) === normalizedTarget,
   );
 
   if (!hasSidebarCandidate) return true;
 
-  return normalizeItemKey(sidebarSectionTitle(activeRow)) === normalizedSection;
+  return (
+    normalizeTopicKey(sidebarSectionTitle(activeRow)) === normalizedSection
+  );
 }
 
 function matchingSidebarButton(
@@ -1323,7 +1327,7 @@ function matchingSidebarButton(
   normalizedSection: string,
 ): Element | null {
   const titleMatches = buttons.filter(
-    (button) => normalizeItemKey(itemTitle(button)) === normalizedTarget,
+    (button) => normalizeTopicKey(topicTitle(button)) === normalizedTarget,
   );
 
   if (titleMatches.length <= 1 || !normalizedSection) {
@@ -1333,7 +1337,7 @@ function matchingSidebarButton(
   return (
     titleMatches.find(
       (button) =>
-        normalizeItemKey(sidebarSectionTitle(button)) === normalizedSection,
+        normalizeTopicKey(sidebarSectionTitle(button)) === normalizedSection,
     ) ??
     titleMatches[0] ??
     null
@@ -1347,15 +1351,15 @@ function matchingSidebarButton(
  * accurate even when the active row moves, duplicate titles exist across
  * sections, or sections hydrate asynchronously).
  */
-function clickSidebarItem(
-  itemIndex: number | undefined,
+function clickSidebarTopic(
+  topicIndex: number | undefined,
   targetTitle = "",
   targetSection = "",
 ): Promise<SidebarClickResult> {
-  const normalizedTarget = targetTitle ? normalizeItemKey(targetTitle) : "";
+  const normalizedTarget = targetTitle ? normalizeTopicKey(targetTitle) : "";
 
   const normalizedSection = targetSection
-    ? normalizeItemKey(targetSection)
+    ? normalizeTopicKey(targetSection)
     : "";
 
   const clickButton = (button: HTMLElement): SidebarClickResult => {
@@ -1367,7 +1371,7 @@ function clickSidebarItem(
 
   const tryClick = (allowIndexFallback = false): SidebarClickResult | null => {
     const expanded = expandSidebarSections();
-    const buttons = sidebarItemButtons();
+    const buttons = sidebarTopicButtons();
 
     if (!buttons.length) return null;
 
@@ -1375,7 +1379,7 @@ function clickSidebarItem(
       const sidebar = buttons[0].closest("aside, [role=complementary]");
 
       const activeRow = sidebar
-        ? findActiveSidebarItem(sidebar, buttons)
+        ? findActiveSidebarTopic(sidebar, buttons)
         : null;
 
       if (
@@ -1400,8 +1404,8 @@ function clickSidebarItem(
     }
 
     const button =
-      typeof itemIndex === "number" && Number.isInteger(itemIndex)
-        ? buttons[itemIndex]
+      typeof topicIndex === "number" && Number.isInteger(topicIndex)
+        ? buttons[topicIndex]
         : null;
 
     return button instanceof HTMLElement ? clickButton(button) : null;
@@ -1450,11 +1454,11 @@ function activeRowFromBadge(
     }
 
     const badgeCount = elementTextLines(current).filter((line) =>
-      ITEM_BADGE_PATTERN.test(line),
+      TOPIC_BADGE_PATTERN.test(line),
     ).length;
 
     if (badgeCount > 1) break;
-    if (isSidebarItemElement(current)) validAncestors.push(current);
+    if (isSidebarTopicElement(current)) validAncestors.push(current);
   }
 
   return validAncestors.at(-1) || null;
@@ -1464,7 +1468,7 @@ function activeRowFromBadge(
  * Finds the active (currently open) item row when the player renders it as a
  * non-button container alongside the sidebar item buttons.
  */
-function findActiveSidebarItem(
+function findActiveSidebarTopic(
   sidebar: Element,
   buttons: readonly Element[],
 ): Element | null {
@@ -1474,7 +1478,7 @@ function findActiveSidebarItem(
     [...sidebar.querySelectorAll("span, div, p")]
       .filter((candidate) => !candidate.closest("button"))
       .filter((candidate) =>
-        ITEM_BADGE_PATTERN.test(
+        TOPIC_BADGE_PATTERN.test(
           cleanText(elementTextLines(candidate).join(" ")),
         ),
       )
@@ -1496,7 +1500,7 @@ function findActiveSidebarItem(
       (child) =>
         !buttonSet.has(child) &&
         !child.querySelector("button") &&
-        isSidebarItemElement(child),
+        isSidebarTopicElement(child),
     );
 
     if (siblingRow) return siblingRow;
@@ -1510,18 +1514,18 @@ function findActiveSidebarItem(
  * order. The player changes items through button clicks and does not expose
  * a distinct item URL.
  */
-function buttonSidebarItems(current: URL): ButtonSidebarItem[] {
-  const buttons = sidebarItemButtons();
+function buttonSidebarTopics(current: URL): ButtonSidebarTopic[] {
+  const buttons = sidebarTopicButtons();
 
   if (!buttons.length) return [];
   const sidebar = buttons[0].closest("aside, [role=complementary]");
-  const activeRow = sidebar ? findActiveSidebarItem(sidebar, buttons) : null;
+  const activeRow = sidebar ? findActiveSidebarTopic(sidebar, buttons) : null;
 
   const entries = buttons.map((button, navigationIndex) => ({
     element: button,
-    id: `sidebar-item-${navigationIndex}`,
+    id: `sidebar-topic-${navigationIndex}`,
     url: current.href,
-    title: itemTitle(button),
+    title: topicTitle(button),
     section: sidebarSectionTitle(button),
     navigationIndex,
   }));
@@ -1529,9 +1533,9 @@ function buttonSidebarItems(current: URL): ButtonSidebarItem[] {
   if (activeRow) {
     entries.push({
       element: activeRow,
-      id: "current-item",
+      id: "current-topic",
       url: current.href,
-      title: itemTitle(activeRow),
+      title: topicTitle(activeRow),
       section: sidebarSectionTitle(activeRow),
       navigationIndex: -1,
     });
@@ -1552,14 +1556,14 @@ function buttonSidebarItems(current: URL): ButtonSidebarItem[] {
     cleanText(
       document.querySelector("main h1, main h2, [role=main] h1, [role=main] h2")
         ?.textContent || "",
-    ) || "Current item";
+    ) || "Current topic";
 
   return [
     {
-      id: "current-item",
+      id: "current-topic",
       url: current.href,
       title: currentTitle,
-      section: "Items",
+      section: "Topics",
       navigationIndex: -1,
     },
     ...entries.map(({ element: _element, ...item }) => item),
@@ -1567,7 +1571,7 @@ function buttonSidebarItems(current: URL): ButtonSidebarItem[] {
 }
 
 /** Reports item links from a rendered sidebar without navigating the tab. */
-const itemPath = /\/sections\/([^/?#]+)\/lessons\/([^/?#]+)/i;
+const topicPath = /\/sections\/([^/?#]+)\/lessons\/([^/?#]+)/i;
 
 function isSectionHeadingText(value: string): boolean {
   return (
@@ -1587,7 +1591,7 @@ function isSectionHeadingText(value: string): boolean {
  * Reads the playlist name from the page header without the header's action
  * buttons, such as "Concluir aula", which would otherwise become part of it.
  */
-function sidebarPlaylistTitle(): string {
+function sidebarTrackTitle(): string {
   const header = document.querySelector("header");
 
   if (header) {
@@ -1610,7 +1614,7 @@ function sidebarPlaylistTitle(): string {
   const fromTitle = cleanText(document.title.split(/[|·–-]/).at(-1) || "");
 
   if (fromTitle) return fromTitle;
-  const slug = /^\/c\/([^/]+)/i.exec(location.pathname)?.[1] || "Playlist";
+  const slug = /^\/c\/([^/]+)/i.exec(location.pathname)?.[1] || "Track";
 
   return cleanText(decodeURIComponent(slug).replace(/-/g, " "));
 }
@@ -1621,23 +1625,23 @@ function sidebarPlaylistTitle(): string {
  * page order. Sidebar links are preferred so that "next item" links elsewhere
  * on the page cannot change the order.
  */
-function sidebarItemLinks(
+function sidebarTopicLinks(
   current: URL,
   sidebarOnly = false,
-): SidebarItemEntry[] {
-  const byItem = new Map<string, SidebarItemEntry>();
+): SidebarTopicEntry[] {
+  const byTopic = new Map<string, SidebarTopicEntry>();
 
   const add = (href: string, element: Element | null): void => {
     const url = tryParseUrl(href, current);
 
     if (!url) return;
-    const match = itemPath.exec(url.pathname);
+    const match = topicPath.exec(url.pathname);
 
-    if (!match || byItem.has(match[2])) return;
-    const title = element ? itemTitle(element) : "Item";
+    if (!match || byTopic.has(match[2])) return;
+    const title = element ? topicTitle(element) : "Topic";
     const heading = element ? sidebarSectionTitle(element) : "";
 
-    byItem.set(
+    byTopic.set(
       match[2],
       Object.freeze({
         id: match[2],
@@ -1662,15 +1666,15 @@ function sidebarItemLinks(
     "aside a[href], [role=complementary] a[href], nav a[href], aside [data-href]",
   );
 
-  if (sidebarOnly) return [...byItem.values()];
+  if (sidebarOnly) return [...byTopic.values()];
 
-  if (byItem.size < 2) addLinks("a[href], [data-href]");
+  if (byTopic.size < 2) addLinks("a[href], [data-href]");
 
-  if (byItem.size < 2) {
-    for (const href of serializedSidebarItemUrls(current)) add(href, null);
+  if (byTopic.size < 2) {
+    for (const href of serializedSidebarTopicUrls(current)) add(href, null);
   }
 
-  return [...byItem.values()];
+  return [...byTopic.values()];
 }
 
 /** Opens collapsed sidebar sections once so that all of their items render. */
@@ -1705,8 +1709,8 @@ function expandSidebarSections(): boolean {
   return controls.length > 0;
 }
 
-function resolvedSidebarItems(current: URL): SidebarItemEntry[] {
-  const buttons = buttonSidebarItems(current).map((item) =>
+function resolvedSidebarTopics(current: URL): SidebarTopicEntry[] {
+  const buttons = buttonSidebarTopics(current).map((item) =>
     Object.freeze({
       ...item,
       sectionKey: item.section,
@@ -1714,12 +1718,12 @@ function resolvedSidebarItems(current: URL): SidebarItemEntry[] {
     }),
   );
 
-  const links = sidebarItemLinks(current, buttons.length >= 2);
+  const links = sidebarTopicLinks(current, buttons.length >= 2);
 
   return buttons.length > links.length ? buttons : links;
 }
 
-function buildSidebarPlaylistOutline(): PlaylistOutline | null {
+function buildSidebarTrackOutline(): TrackOutline | null {
   if (
     !/^\/c\/[^/]+\/sections\/[^/]+\/lessons\/[^/]+/i.test(location.pathname)
   ) {
@@ -1727,8 +1731,8 @@ function buildSidebarPlaylistOutline(): PlaylistOutline | null {
   }
 
   const current = new URL(location.href);
-  const playlistTitle = sidebarPlaylistTitle();
-  const found = resolvedSidebarItems(current);
+  const trackTitle = sidebarTrackTitle();
+  const found = resolvedSidebarTopics(current);
 
   if (found.length < 2) return null;
   const sections = new Map<string, SidebarSectionAccumulator>();
@@ -1751,7 +1755,7 @@ function buildSidebarPlaylistOutline(): PlaylistOutline | null {
     }
   }
 
-  const items = found.flatMap((item): PlaylistOutlineItem[] => {
+  const items = found.flatMap((item): TrackOutlineTopic[] => {
     const section = sections.get(item.sectionKey);
 
     if (!section) return [];
@@ -1763,7 +1767,7 @@ function buildSidebarPlaylistOutline(): PlaylistOutline | null {
         url: item.url,
         fileTitle: `${section.number}.${section.count} ${item.title}`,
         folderPath: [
-          playlistRootFolderName(playlistTitle, location.href),
+          trackRootFolderName(trackTitle, location.href),
           `${section.number}. ${section.title}`,
         ],
         ...(typeof item.navigationIndex === "number" &&
@@ -1774,10 +1778,10 @@ function buildSidebarPlaylistOutline(): PlaylistOutline | null {
     ];
   });
 
-  return { title: playlistTitle, items };
+  return { title: trackTitle, items };
 }
 
-function isPlaylistOutlinePayload(value: unknown): value is PlaylistOutline {
+function isTrackOutlinePayload(value: unknown): value is TrackOutline {
   return (
     isObjectRecord(value) &&
     typeof value.title === "string" &&
@@ -1791,7 +1795,7 @@ function isPlaylistOutlinePayload(value: unknown): value is PlaylistOutline {
  * 1440x900 offscreen iframe when a responsive playlist page unmounts or hides
  * its sidebar on medium/small viewports.
  */
-function collectOffscreenDesktopOutline(): Promise<PlaylistOutline | null> {
+function collectOffscreenDesktopOutline(): Promise<TrackOutline | null> {
   if (isHiddenHelperFrame || window.top !== window) {
     return Promise.resolve(null);
   }
@@ -1806,7 +1810,7 @@ function collectOffscreenDesktopOutline(): Promise<PlaylistOutline | null> {
   offscreenOutlineState.attemptedUrls.add(targetUrl);
   const requestId = crypto.randomUUID();
 
-  const pending = new Promise<PlaylistOutline | null>((resolve) => {
+  const pending = new Promise<TrackOutline | null>((resolve) => {
     const frame = document.createElement("iframe");
 
     frame.name = `${hiddenOutlinePrefix}${requestId}`;
@@ -1819,7 +1823,7 @@ function collectOffscreenDesktopOutline(): Promise<PlaylistOutline | null> {
       (document.body || document.documentElement)?.append(frame);
     };
 
-    const cleanup = (outline: PlaylistOutline | null): void => {
+    const cleanup = (outline: TrackOutline | null): void => {
       clearTimeout(timeout);
       window.removeEventListener("DOMContentLoaded", mountFrame);
       window.removeEventListener("message", onMessage);
@@ -1840,16 +1844,14 @@ function collectOffscreenDesktopOutline(): Promise<PlaylistOutline | null> {
         event.source !== frame.contentWindow ||
         !isObjectRecord(event.data) ||
         event.data.source !== "opfs-media-packager" ||
-        event.data.type !== "offscreen-playlist-outline" ||
+        event.data.type !== "offscreen-track-outline" ||
         event.data.requestId !== requestId
       ) {
         return;
       }
 
       cleanup(
-        isPlaylistOutlinePayload(event.data.outline)
-          ? event.data.outline
-          : null,
+        isTrackOutlinePayload(event.data.outline) ? event.data.outline : null,
       );
     };
 
@@ -1871,8 +1873,8 @@ function collectOffscreenDesktopOutline(): Promise<PlaylistOutline | null> {
   return pending;
 }
 
-function publishPlaylistOutline(
-  outline: PlaylistOutline,
+function publishTrackOutline(
+  outline: TrackOutline,
   force: boolean,
 ): Promise<unknown> | undefined {
   const fingerprint = JSON.stringify(outline);
@@ -1881,12 +1883,12 @@ function publishPlaylistOutline(
   contentState.lastOutlineFingerprint = fingerprint;
 
   return chrome.runtime
-    .sendMessage({ type: "playlist-outline", outline })
+    .sendMessage({ type: "track-outline", outline })
     .catch(() => {});
 }
 
 /** Reports item links from a rendered sidebar without navigating the tab. */
-function reportSidebarPlaylistOutline(
+function reportSidebarTrackOutline(
   force = false,
 ): Promise<unknown> | undefined {
   if (
@@ -1895,17 +1897,17 @@ function reportSidebarPlaylistOutline(
     return;
   }
 
-  const visibleOutline = buildSidebarPlaylistOutline();
+  const visibleOutline = buildSidebarTrackOutline();
 
   const hasMountedSidebar =
     Boolean(document.querySelector("aside, [role=complementary]")) &&
-    sidebarItemButtons().length > 0;
+    sidebarTopicButtons().length > 0;
 
   if (
     visibleOutline &&
     (hasMountedSidebar || visibleOutline.items.length >= 3)
   ) {
-    return publishPlaylistOutline(visibleOutline, force);
+    return publishTrackOutline(visibleOutline, force);
   }
 
   if (
@@ -1914,7 +1916,7 @@ function reportSidebarPlaylistOutline(
       offscreenOutlineState.attemptedUrls.has(location.href))
   ) {
     return visibleOutline
-      ? publishPlaylistOutline(visibleOutline, force)
+      ? publishTrackOutline(visibleOutline, force)
       : undefined;
   }
 
@@ -1927,47 +1929,47 @@ function reportSidebarPlaylistOutline(
 
     if (!chosen) return;
 
-    return publishPlaylistOutline(chosen, force);
+    return publishTrackOutline(chosen, force);
   });
 }
 
 /** Reports the playlist tree in DOM order; the worker probes stream capability. */
-function reportPlaylistOutline(force = false): Promise<unknown> | undefined {
+function reportTrackOutline(force = false): Promise<unknown> | undefined {
   if (isHiddenHelperFrame) return;
 
   if (/^\/c\/[^/]+\/sections\/[^/]+\/lessons\/[^/]+/i.test(location.pathname)) {
-    return reportSidebarPlaylistOutline(force);
+    return reportSidebarTrackOutline(force);
   }
 
   if (!/\/courses\//i.test(location.pathname)) return;
   const currentUrl = new URL(location.href);
   const rootName = cleanText(document.title.split("|").at(-1) || "Playlist");
 
-  const chapterItems = [
+  const chapterTopics = [
     ...document.querySelectorAll('[id^="chapter-"]'),
   ].flatMap((chapter, chapterIndex) => {
     const section = chapterTitle(chapter);
 
     return [...chapter.querySelectorAll('[id^="list-content-"]')]
-      .map((item, itemIndex) =>
-        outlineItem(
+      .map((item, topicIndex) =>
+        outlineTopic(
           item,
           currentUrl,
-          `${chapterIndex + 1}.${itemIndex + 1} ${itemTitle(item)}`,
+          `${chapterIndex + 1}.${topicIndex + 1} ${topicTitle(item)}`,
           [
-            playlistRootFolderName(rootName, location.href),
+            trackRootFolderName(rootName, location.href),
             `${chapterIndex + 1}. ${section}`,
           ],
         ),
       )
-      .filter((item): item is PlaylistOutlineItem => item !== null);
+      .filter((item): item is TrackOutlineTopic => item !== null);
   });
 
-  const items = chapterItems.length
-    ? chapterItems
+  const items = chapterTopics.length
+    ? chapterTopics
     : (() => {
         const sectionNumbers = new Map<string, number>();
-        const itemNumbers = new Map<string, number>();
+        const topicNumbers = new Map<string, number>();
 
         return [...document.querySelectorAll('[id^="list-content-"]')]
           .map((item) => {
@@ -1977,21 +1979,21 @@ function reportPlaylistOutline(force = false): Promise<unknown> | undefined {
               sectionNumbers.get(section) || sectionNumbers.size + 1;
 
             sectionNumbers.set(section, sectionNumber);
-            const itemNumber = (itemNumbers.get(section) || 0) + 1;
+            const topicNumber = (topicNumbers.get(section) || 0) + 1;
 
-            itemNumbers.set(section, itemNumber);
+            topicNumbers.set(section, topicNumber);
 
-            return outlineItem(
+            return outlineTopic(
               item,
               currentUrl,
-              `${sectionNumber}.${itemNumber} ${itemTitle(item)}`,
+              `${sectionNumber}.${topicNumber} ${topicTitle(item)}`,
               [
-                playlistRootFolderName(rootName, location.href),
+                trackRootFolderName(rootName, location.href),
                 `${sectionNumber}. ${section}`,
               ],
             );
           })
-          .filter((item): item is PlaylistOutlineItem => item !== null);
+          .filter((item): item is TrackOutlineTopic => item !== null);
       })();
 
   const unique = items.filter(
@@ -2001,7 +2003,7 @@ function reportPlaylistOutline(force = false): Promise<unknown> | undefined {
 
   if (!unique.length) return;
 
-  return publishPlaylistOutline({ title: rootName, items: unique }, force);
+  return publishTrackOutline({ title: rootName, items: unique }, force);
 }
 
 const SUBTITLE_TRACK_SELECTOR =
@@ -2119,7 +2121,7 @@ function reportTracks(force = false): void {
 function runHiddenOutlineFrameCollector(): void {
   const state: {
     done: boolean;
-    best: PlaylistOutline | null;
+    best: TrackOutline | null;
     settleTimer: ReturnType<typeof setTimeout> | null;
   } = {
     done: false,
@@ -2137,7 +2139,7 @@ function runHiddenOutlineFrameCollector(): void {
     window.parent.postMessage(
       {
         source: "opfs-media-packager",
-        type: "offscreen-playlist-outline",
+        type: "offscreen-track-outline",
         requestId: currentHiddenOutlineId,
         outline: state.best,
       },
@@ -2148,7 +2150,7 @@ function runHiddenOutlineFrameCollector(): void {
   const inspect = (): void => {
     if (state.done) return;
     expandSidebarSections();
-    const outline = buildSidebarPlaylistOutline();
+    const outline = buildSidebarTrackOutline();
 
     if (!outline || outline.items.length <= (state.best?.items.length || 0)) {
       return;
@@ -2208,12 +2210,12 @@ if (
 ) {
   reportPageLocation();
   reportTracks();
-  reportPlaylistOutline();
+  reportTrackOutline();
 
   new MutationObserver(() => {
     reportPageLocation();
     reportTracks();
-    reportPlaylistOutline();
+    reportTrackOutline();
   }).observe(document.documentElement || document, {
     childList: true,
     subtree: true,

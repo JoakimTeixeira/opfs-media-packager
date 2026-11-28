@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import ts from "typescript";
 
 const pureRuleFiles = [
-  "lib/playlist/playlist-queue-policy.ts",
+  "lib/track/track-queue-policy.ts",
   "lib/shared/filename.ts",
   "lib/media/hls-master.ts",
   "lib/downloads/large-file-remux.ts",
@@ -75,7 +75,10 @@ test("should detect browser-global access without matching comments or strings",
     ["chrome", "window", "document"],
   );
 
-  assert.deepStrictEqual(browserGlobalAccess('const note = "chrome.tabs";'), []);
+  assert.deepStrictEqual(
+    browserGlobalAccess('const note = "chrome.tabs";'),
+    [],
+  );
 
   assert.deepStrictEqual(
     browserGlobalAccess(
@@ -135,9 +138,9 @@ test("should keep reusable modules independent of extension entry points", async
     "app",
     "background",
     "content",
-    "playlist",
+    "track",
     "popup",
-    "page-playlist-probe",
+    "page-track-probe",
   ]);
 
   const productionFiles = (await readdir(root, { recursive: true })).filter(

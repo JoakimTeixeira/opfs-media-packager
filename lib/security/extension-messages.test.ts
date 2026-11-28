@@ -2,9 +2,9 @@ import { test } from "vitest";
 import assert from "node:assert/strict";
 import {
   isTrustedExtensionSender,
-  isTrustedPlaylistSender,
-  isTrustedPlaylistFrameSender,
-  isTrustedApiPlaylistSender,
+  isTrustedTrackSender,
+  isTrustedTrackFrameSender,
+  isTrustedApiTrackSender,
   validatedDownloadRequest,
 } from "./extension-messages.ts";
 
@@ -75,7 +75,7 @@ test("should allow privileged actions only from this extension's own pages", () 
 
 test("should restrict API and top-level course senders to frameId 0 and trusted routes", () => {
   assert.equal(
-    isTrustedApiPlaylistSender(
+    isTrustedApiTrackSender(
       {
         id: "extension",
         frameId: 0,
@@ -87,7 +87,7 @@ test("should restrict API and top-level course senders to frameId 0 and trusted 
   );
 
   assert.equal(
-    isTrustedApiPlaylistSender(
+    isTrustedApiTrackSender(
       {
         id: "extension",
         frameId: 1,
@@ -99,7 +99,7 @@ test("should restrict API and top-level course senders to frameId 0 and trusted 
   );
 
   assert.equal(
-    isTrustedApiPlaylistSender(
+    isTrustedApiTrackSender(
       { id: "other", frameId: 0, url: "https://training.example/courses/a" },
       "extension",
     ),
@@ -107,17 +107,17 @@ test("should restrict API and top-level course senders to frameId 0 and trusted 
   );
 
   assert.equal(
-    isTrustedApiPlaylistSender(
+    isTrustedApiTrackSender(
       { id: "extension", frameId: 0, url: "https://training.example/other" },
       "extension",
     ),
     false,
   );
 
-  assert.equal(isTrustedApiPlaylistSender(null, "extension"), false);
+  assert.equal(isTrustedApiTrackSender(null, "extension"), false);
 
   assert.equal(
-    isTrustedPlaylistSender(
+    isTrustedTrackSender(
       {
         id: "extension",
         frameId: 0,
@@ -129,7 +129,7 @@ test("should restrict API and top-level course senders to frameId 0 and trusted 
   );
 
   assert.equal(
-    isTrustedPlaylistSender(
+    isTrustedTrackSender(
       {
         id: "extension",
         frameId: 1,
@@ -141,7 +141,7 @@ test("should restrict API and top-level course senders to frameId 0 and trusted 
   );
 
   assert.equal(
-    isTrustedPlaylistSender(
+    isTrustedTrackSender(
       {
         id: "extension",
         frameId: 0,
@@ -153,7 +153,7 @@ test("should restrict API and top-level course senders to frameId 0 and trusted 
   );
 
   assert.equal(
-    isTrustedPlaylistSender(
+    isTrustedTrackSender(
       { id: "extension", frameId: 0, url: "https://training.example/c/course" },
       "extension",
     ),
@@ -161,7 +161,7 @@ test("should restrict API and top-level course senders to frameId 0 and trusted 
   );
 
   assert.equal(
-    isTrustedPlaylistSender(
+    isTrustedTrackSender(
       {
         id: "other-extension",
         frameId: 0,
@@ -172,12 +172,12 @@ test("should restrict API and top-level course senders to frameId 0 and trusted 
     false,
   );
 
-  assert.equal(isTrustedPlaylistSender(undefined, "extension"), false);
+  assert.equal(isTrustedTrackSender(undefined, "extension"), false);
 });
 
-test("should allow hidden same-origin probe frames only via isTrustedPlaylistFrameSender", () => {
+test("should allow hidden same-origin probe frames only via isTrustedTrackFrameSender", () => {
   assert.equal(
-    isTrustedPlaylistFrameSender(
+    isTrustedTrackFrameSender(
       {
         id: "extension",
         frameId: 0,
@@ -189,7 +189,7 @@ test("should allow hidden same-origin probe frames only via isTrustedPlaylistFra
   );
 
   assert.equal(
-    isTrustedPlaylistFrameSender(
+    isTrustedTrackFrameSender(
       {
         id: "extension",
         frameId: 42,
@@ -201,7 +201,7 @@ test("should allow hidden same-origin probe frames only via isTrustedPlaylistFra
   );
 
   assert.equal(
-    isTrustedPlaylistFrameSender(
+    isTrustedTrackFrameSender(
       {
         id: "extension",
         frameId: 42,
@@ -213,7 +213,7 @@ test("should allow hidden same-origin probe frames only via isTrustedPlaylistFra
   );
 
   assert.equal(
-    isTrustedPlaylistFrameSender(
+    isTrustedTrackFrameSender(
       {
         id: "extension",
         frameId: -1,
@@ -225,7 +225,7 @@ test("should allow hidden same-origin probe frames only via isTrustedPlaylistFra
   );
 
   assert.equal(
-    isTrustedPlaylistFrameSender(
+    isTrustedTrackFrameSender(
       { id: "other", frameId: 42, url: "https://training.example/courses/a" },
       "extension",
     ),
@@ -233,7 +233,7 @@ test("should allow hidden same-origin probe frames only via isTrustedPlaylistFra
   );
 
   assert.equal(
-    isTrustedPlaylistFrameSender(
+    isTrustedTrackFrameSender(
       { id: "extension", frameId: 42, url: "https://attacker.example/other" },
       "extension",
     ),
@@ -241,7 +241,7 @@ test("should allow hidden same-origin probe frames only via isTrustedPlaylistFra
   );
 
   assert.equal(
-    isTrustedPlaylistFrameSender(
+    isTrustedTrackFrameSender(
       {
         id: "extension",
         frameId: "0",
@@ -252,7 +252,7 @@ test("should allow hidden same-origin probe frames only via isTrustedPlaylistFra
     false,
   );
 
-  assert.equal(isTrustedPlaylistFrameSender(null, "extension"), false);
+  assert.equal(isTrustedTrackFrameSender(null, "extension"), false);
 });
 
 test("should validate the download request once at the privileged boundary", () => {

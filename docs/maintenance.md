@@ -8,8 +8,8 @@ The browser entry points are in [`src/`](../src/). The [architecture map](projec
 
 | Change                          | Where to start                                                           | Evidence to find or add                                             |
 | ------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------- |
-| Playlist page detection         | Page adapters in `lib/` and the page-observation entry points in `src/`. | Adapter rules and playlist-scan integration tests.                  |
-| Item request pacing             | Playlist scanning entry points in `src/`.                                | Integration tests for request spacing, retries, and host limits.    |
+| Track page detection            | Page adapters in `lib/` and the page-observation entry points in `src/`. | Adapter rules and track-scan integration tests.                     |
+| Item request pacing             | Track scanning entry points in `src/`.                                   | Integration tests for request spacing, retries, and host limits.    |
 | Download queue and cancellation | Downloader entry point in `src/` and queue rules in `lib/`.              | Browser tests for cancellation, resume, and access failures.        |
 | File names and destination      | Filename and download-folder rules in `lib/`.                            | Tests for valid names, matching subtitles, and destination folders. |
 | Stored video parts and resume   | Download coordination in `src/` and checkpoint rules in `lib/`.          | Checkpoint validation and browser download recovery tests.          |

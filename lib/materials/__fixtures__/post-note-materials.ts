@@ -1,6 +1,6 @@
-import type { ItemCompanionDocuments } from "../item-assets.ts";
+import type { TopicCompanionDocuments } from "../topic-assets.ts";
 
-export const postNoteMaterials: ItemCompanionDocuments = {
+export const postNoteMaterials: TopicCompanionDocuments = {
   markdown: "# Post 1\n\nRepo [link](https://github.com/org/repo)\n",
   images: [
     {

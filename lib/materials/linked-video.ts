@@ -93,9 +93,9 @@ export function scoreLinkedVideoUrl(
 const SIDEBAR_PLAYLIST_ITEM_PATTERN =
   /^\/c\/([^/]+)\/sections\/[^/]+\/lessons\/[^/]+/i;
 
-const SLUG_PLAYLIST_ITEM_PATTERN = /^\/courses\/([^/]+)/i;
+const SLUG_TRACK_TOPIC_PATTERN = /^\/courses\/([^/]+)/i;
 
-function isSamePlaylistSiblingUrl(
+function isSameTrackSiblingUrl(
   candidatePathname: string,
   currentPathname: string,
 ): boolean {
@@ -110,13 +110,11 @@ function isSamePlaylistSiblingUrl(
     );
   }
 
-  const currentPlaylist = SLUG_PLAYLIST_ITEM_PATTERN.exec(currentPathname);
-  const candidatePlaylist = SLUG_PLAYLIST_ITEM_PATTERN.exec(candidatePathname);
+  const currentTrack = SLUG_TRACK_TOPIC_PATTERN.exec(currentPathname);
+  const candidateTrack = SLUG_TRACK_TOPIC_PATTERN.exec(candidatePathname);
 
-  if (currentPlaylist && candidatePlaylist) {
-    return (
-      currentPlaylist[1].toLowerCase() === candidatePlaylist[1].toLowerCase()
-    );
+  if (currentTrack && candidateTrack) {
+    return currentTrack[1].toLowerCase() === candidateTrack[1].toLowerCase();
   }
 
   return false;
@@ -140,5 +138,5 @@ export function isSupplementaryLinkedPostUrl(
 
   if (scoreLinkedVideoUrl(candidate.href, current.href) <= 0) return false;
 
-  return !isSamePlaylistSiblingUrl(candidate.pathname, current.pathname);
+  return !isSameTrackSiblingUrl(candidate.pathname, current.pathname);
 }

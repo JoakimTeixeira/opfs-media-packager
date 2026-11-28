@@ -2,7 +2,7 @@ interface DownloadControlInput {
   readonly busy: boolean;
   readonly hasPlaylist: boolean;
   readonly downloadActive: boolean;
-  readonly canResumePlaylist?: boolean;
+  readonly canResumeTrack?: boolean;
 }
 
 interface DownloadControlFlags {
@@ -32,7 +32,7 @@ export function downloadControlState(
     cancelHidden: !input.downloadActive,
     concurrencyDisabled: input.downloadActive,
     downloadDisabled:
-      input.busy || (!input.hasPlaylist && !input.canResumePlaylist),
+      input.busy || (!input.hasPlaylist && !input.canResumeTrack),
     filenameDisabled: input.downloadActive,
     outputDisabled: input.downloadActive,
     qualityDisabled: !canChooseQuality,

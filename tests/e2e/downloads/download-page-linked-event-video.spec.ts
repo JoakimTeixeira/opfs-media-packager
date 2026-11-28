@@ -23,13 +23,13 @@ test("should download a lesson with a primary HLS video, subtitle, and linked di
     await setupPage.evaluate(
       async ({ eventUrl, id, origin }) => {
         await chrome.storage.session.set({
-          [`playlist-scan:${id}`]: {
+          [`track-scan:${id}`]: {
             id,
             title: "Sample Node Course",
             status: "ready",
             rateLimited: false,
-            nextItemIndex: 1,
-            currentItemIndex: null,
+            nextTopicIndex: 1,
+            currentTopicIndex: null,
             sourceTabId: null,
             startedAt: Date.now(),
             items: [
@@ -37,7 +37,7 @@ test("should download a lesson with a primary HLS video, subtitle, and linked di
                 id: "5001",
                 url: `${origin}/c/sample-course/sections/1/lessons/5001`,
                 fileTitle: "1.1 O que vai ser construido",
-                folderPath: ["(Playlist) Sample Course", "1. Introducao"],
+                folderPath: ["(Track) Sample Course", "1. Introducao"],
               },
             ],
             discovered: [
@@ -77,8 +77,8 @@ test("should download a lesson with a primary HLS video, subtitle, and linked di
                   },
                 ],
                 detectedAt: Date.now(),
-                folderPath: ["(Playlist) Sample Course", "1. Introducao"],
-                itemIndex: 0,
+                folderPath: ["(Track) Sample Course", "1. Introducao"],
+                topicIndex: 0,
                 documents: {
                   markdown: [
                     "# 1.1 O que vai ser construido",
@@ -120,10 +120,10 @@ test("should download a lesson with a primary HLS video, subtitle, and linked di
 
     try {
       await coursePage.goto(
-        `chrome-extension://${extensionId}/src/playlist.html?scan=${scanId}`,
+        `chrome-extension://${extensionId}/src/track.html?scan=${scanId}`,
       );
 
-      await expect(coursePage.locator(".item-meta").first()).toContainText(
+      await expect(coursePage.locator(".topic-meta").first()).toContainText(
         "2 videos · Portuguese · MD · 1 image",
       );
 
@@ -134,7 +134,7 @@ test("should download a lesson with a primary HLS video, subtitle, and linked di
 
       try {
         await expect(queuePage.locator("#message")).toHaveText(
-          "Playlist download finished",
+          "Track download finished",
           { timeout: 30000 },
         );
 
@@ -143,7 +143,7 @@ test("should download a lesson with a primary HLS video, subtitle, and linked di
         const lessonFolder = join(
           downloadsDir,
           "HLS Videos",
-          "(Playlist) Sample Course",
+          "(Track) Sample Course",
           "1. Introducao",
         );
 

@@ -47,17 +47,17 @@ test("should keep page-originated data behind a validated message and URL bounda
   const content = await readFile(new URL("src/content.ts", root), "utf8");
   const app = await readFile(new URL("src/app.ts", root), "utf8");
   const popup = await readFile(new URL("src/popup.ts", root), "utf8");
-  const course = await readFile(new URL("src/playlist.ts", root), "utf8");
+  const course = await readFile(new URL("src/track.ts", root), "utf8");
 
   const pageCourseProbe = await readFile(
-    new URL("src/page-playlist-probe.ts", root),
+    new URL("src/page-track-probe.ts", root),
     "utf8",
   );
 
   assert.match(background, /isTrustedExtensionSender/);
-  assert.match(background, /isTrustedPlaylistSender/);
-  assert.match(background, /isTrustedPlaylistFrameSender/);
-  assert.match(background, /fetchFromPlaylistPage/);
+  assert.match(background, /isTrustedTrackSender/);
+  assert.match(background, /isTrustedTrackFrameSender/);
+  assert.match(background, /fetchFromTrackPage/);
   assert.match(background, /fetch-source-media/);
   assert.match(background, /page-media-result/);
   assert.match(background, /validatedDownloadRequest/);
@@ -84,20 +84,20 @@ test("should keep page-originated data behind a validated message and URL bounda
     /\[401, 403, 404, 429, 503\]\.includes\(response\.status\)/,
   );
 
-  assert.match(app, /function classifyPlaylistItemFailure/);
+  assert.match(app, /function classifyTrackTopicFailure/);
 
   assert.match(
     app,
-    /shouldHaltPlaylistQueue[\s\S]*from "\.\.\/lib\/playlist\/playlist-queue-policy\.ts"/,
+    /shouldHaltTrackQueue[\s\S]*from "\.\.\/lib\/track\/track-queue-policy\.ts"/,
   );
 
   const queuePolicy = await readFile(
-    new URL("lib/playlist/playlist-queue-policy.ts", root),
+    new URL("lib/track/track-queue-policy.ts", root),
     "utf8",
   );
 
-  assert.match(queuePolicy, /export function shouldHaltPlaylistQueue/);
-  assert.match(app, /async function runSinglePlaylistItem/);
+  assert.match(queuePolicy, /export function shouldHaltTrackQueue/);
+  assert.match(app, /async function runSingleTrackTopic/);
   assert.notMatch(popup, /if \(result\?\.error\)/);
   assert.match(popup, /if \(!result\?\.ok\)/);
   assert.match(popup, /window\.addEventListener\("error"/);
@@ -124,9 +124,9 @@ test("should keep page-originated data behind a validated message and URL bounda
 
   assert.match(pageCourseProbe, /rateLimited:\s*batchState\.rateLimited/);
   assert.match(pageCourseProbe, /media_transcript_id/);
-  assert.match(pageCourseProbe, /extractItemCompanionDocumentsFromRichText/);
-  assert.match(course, /DEFAULT_PLAYLIST_DOWNLOAD_MODE/);
-  assert.match(course, /playlistDownloadMode/);
+  assert.match(pageCourseProbe, /extractTopicCompanionDocumentsFromRichText/);
+  assert.match(course, /DEFAULT_TRACK_DOWNLOAD_MODE/);
+  assert.match(course, /trackDownloadMode/);
 
   const diagramFnStart = background.indexOf(
     "async function exportExcalidrawSvg",
@@ -270,8 +270,8 @@ test("should prevent else-branch and nested-ternary cognitive complexity regress
   const coreFiles = [
     "src/background.ts",
     "src/content.ts",
-    "src/playlist.ts",
-    "src/page-playlist-probe.ts",
+    "src/track.ts",
+    "src/page-track-probe.ts",
     "lib/subtitles/subtitle-language.ts",
     "lib/security/extension-messages.ts",
   ];

@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "npm run build:extension && node scripts/check-extension-files.ts",
-    "build:extension": "esbuild src/app.ts src/background.ts src/playlist.ts src/popup.ts --bundle --format=esm --target=chrome120 --sourcemap --tree-shaking=true --outdir=dist && esbuild src/content.ts src/page-playlist-probe.ts --bundle --format=iife --target=chrome120 --sourcemap --tree-shaking=true --outdir=dist",
+    "build:extension": "esbuild src/app.ts src/background.ts src/track.ts src/popup.ts --bundle --format=esm --target=chrome120 --sourcemap --tree-shaking=true --outdir=dist && esbuild src/content.ts src/page-track-probe.ts --bundle --format=iife --target=chrome120 --sourcemap --tree-shaking=true --outdir=dist",
     "test": "vitest run",
     "test:unit": "vitest run lib src",
     "test:integration": "vitest run tests/integration",

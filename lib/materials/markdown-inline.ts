@@ -8,7 +8,7 @@ import type {
   TiptapEntityRef,
   TiptapMark,
   TiptapNode,
-} from "./item-markdown.ts";
+} from "./topic-markdown.ts";
 
 export interface RenderContext {
   readonly depth: number;

@@ -80,7 +80,7 @@ test("should enable download when an idle playlist is ready", () => {
       busy: false,
       hasPlaylist: false,
       downloadActive: false,
-      canResumePlaylist: true,
+      canResumeTrack: true,
     }).downloadDisabled,
     false,
   );

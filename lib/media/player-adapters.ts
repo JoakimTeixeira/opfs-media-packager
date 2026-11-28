@@ -1,4 +1,4 @@
-import { isApiPlaylistPage } from "../playlist/playlist-adapters.ts";
+import { isApiTrackPage } from "../track/track-adapters.ts";
 import type { VideoQualityOption } from "./hls-master.ts";
 
 function isNumericQualityPlaylist(url: string): boolean {
@@ -37,10 +37,7 @@ export function mediaReferrerPolicy(
     const media = new URL(mediaUrl);
     const source = new URL(sourceUrl);
 
-    if (
-      isNumericQualityPlaylist(media.href) &&
-      isApiPlaylistPage(source.href)
-    ) {
+    if (isNumericQualityPlaylist(media.href) && isApiTrackPage(source.href)) {
       return "unsafe-url";
     }
   } catch {

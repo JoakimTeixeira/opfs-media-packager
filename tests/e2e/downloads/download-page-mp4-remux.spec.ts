@@ -218,23 +218,23 @@ test("should drive app.ts Download and FFmpeg remux to save both MP4 and VTT wit
         expect(file).not.toMatch(uuidPattern);
       }
 
-      // Now verify a multi-lesson course queue (`index.html?playlist=...`) downloads
+      // Now verify a multi-lesson course queue (`index.html?track=...`) downloads
       // Lesson 1 and Lesson 2 sequentially across distinct CDN directories and
       // survives a page reload without resetting to "Course download unavailable".
       const courseId = "e2e-course-queue";
 
       await setupPage.evaluate(async (id) => {
         await chrome.storage.session.set({
-          [`playlist-download:${id}`]: {
+          [`track-download:${id}`]: {
             title: "IA First Dev",
             outputFormat: "mp4",
-            playlistQualityPreference: "best",
+            trackQualityPreference: "best",
             subtitleDownloadPreference: "included",
             segmentConcurrency: 3,
-            completedItemIndices: [],
+            completedTopicIndices: [],
             items: [
               {
-                itemIndex: 0,
+                topicIndex: 0,
                 title: "1.1 Aula Um",
                 url: "https://media.example.test/lesson-1/720p/video.m3u8",
                 sourceUrl: "https://training.example/c/ai/sections/1/lessons/1",
@@ -248,7 +248,7 @@ test("should drive app.ts Download and FFmpeg remux to save both MP4 and VTT wit
                 subtitles: [],
               },
               {
-                itemIndex: 1,
+                topicIndex: 1,
                 title: "1.2 Aula Dois",
                 url: "https://media.example.test/lesson-2/720p/video.m3u8",
                 sourceUrl: "https://training.example/c/ai/sections/1/lessons/2",
@@ -267,16 +267,16 @@ test("should drive app.ts Download and FFmpeg remux to save both MP4 and VTT wit
       }, courseId);
 
       await downloadPage.goto(
-        `chrome-extension://${extensionId}/src/index.html?playlist=${courseId}`,
+        `chrome-extension://${extensionId}/src/index.html?track=${courseId}`,
       );
 
       await expect(downloadPage.locator("#message")).toHaveText(
-        "Playlist download finished",
+        "Track download finished",
         { timeout: 25000 },
       );
 
-      await expect(downloadPage.locator("#playlist-download-note")).toHaveText(
-        "2 items saved.",
+      await expect(downloadPage.locator("#track-download-note")).toHaveText(
+        "2 topics saved.",
       );
 
       const courseFilesOnDisk = (
@@ -296,7 +296,7 @@ test("should drive app.ts Download and FFmpeg remux to save both MP4 and VTT wit
       await downloadPage.reload();
 
       await expect(downloadPage.locator("#message")).toHaveText(
-        "Playlist download finished",
+        "Track download finished",
         { timeout: 10000 },
       );
 
@@ -306,16 +306,16 @@ test("should drive app.ts Download and FFmpeg remux to save both MP4 and VTT wit
 
       await setupPage.evaluate(async (id) => {
         await chrome.storage.session.set({
-          [`playlist-download:${id}`]: {
+          [`track-download:${id}`]: {
             title: "IA First Dev",
             outputFormat: "mp4",
-            playlistQualityPreference: "best",
+            trackQualityPreference: "best",
             subtitleDownloadPreference: "none",
             segmentConcurrency: 3,
-            completedItemIndices: [],
+            completedTopicIndices: [],
             items: [
               {
-                itemIndex: 0,
+                topicIndex: 0,
                 title: "2.1 Aula Rate Limited",
                 url: "https://media.example.test/lesson-429/720p/video.m3u8",
                 sourceUrl: "https://training.example/c/ai/sections/2/lessons/1",
@@ -329,7 +329,7 @@ test("should drive app.ts Download and FFmpeg remux to save both MP4 and VTT wit
                 subtitles: [],
               },
               {
-                itemIndex: 1,
+                topicIndex: 1,
                 title: "2.2 Aula Must Not Run",
                 url: "https://media.example.test/lesson-skipped/720p/video.m3u8",
                 sourceUrl: "https://training.example/c/ai/sections/2/lessons/2",
@@ -348,24 +348,22 @@ test("should drive app.ts Download and FFmpeg remux to save both MP4 and VTT wit
       }, rateLimitedCourseId);
 
       await downloadPage.goto(
-        `chrome-extension://${extensionId}/src/index.html?playlist=${rateLimitedCourseId}`,
+        `chrome-extension://${extensionId}/src/index.html?track=${rateLimitedCourseId}`,
       );
 
       await expect(downloadPage.locator("#message")).toHaveText(
-        "Playlist download paused — rate limit reached",
+        "Track download paused — rate limit reached",
         { timeout: 10000 },
       );
 
       const storedPlan = await setupPage.evaluate(async (id) => {
-        const result = await chrome.storage.session.get(
-          `playlist-download:${id}`,
-        );
+        const result = await chrome.storage.session.get(`track-download:${id}`);
 
-        return result[`playlist-download:${id}`] as
-          { completedItemIndices?: readonly number[] } | undefined;
+        return result[`track-download:${id}`] as
+          { completedTopicIndices?: readonly number[] } | undefined;
       }, rateLimitedCourseId);
 
-      expect(storedPlan?.completedItemIndices ?? []).toEqual([]);
+      expect(storedPlan?.completedTopicIndices ?? []).toEqual([]);
     } finally {
       await downloadPage.close();
     }

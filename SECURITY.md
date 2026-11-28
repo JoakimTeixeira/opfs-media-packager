@@ -4,7 +4,7 @@ The project uses the OWASP Application Top 10 2025 from the Open Worldwide Appli
 
 | Risk area        | Control                                                                                                                                                                                                                    |
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Access control   | Privileged messages require an extension-page sender. Playlist messages also require a recognized playlist-page structure.                                                                                                 |
+| Access control   | Privileged messages require an extension-page sender. Playlist messages also require a recognized track-page structure.                                                                                                    |
 | Configuration    | Manifest V3 uses a self-only content security policy. A content security policy blocks inline and remote scripts that the extension did not package. Websites have no external-message API for calling extension handlers. |
 | Dependencies     | The lock file pins dependency versions. FFmpeg is packaged with the extension. The extension loads no executable code from remote hosts.                                                                                   |
 | Credentials      | Chrome manages session cookies. Media URLs can contain temporary access tokens and can pass through extension state and requests. Reject URLs with embedded user names or passwords and avoid sharing signed URLs.         |

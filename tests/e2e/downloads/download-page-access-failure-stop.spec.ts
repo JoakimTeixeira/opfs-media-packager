@@ -27,7 +27,7 @@ test("should stop a course after two denied lessons without requesting the third
         const url = `https://denied.example.test/lesson-${index}/video.m3u8`;
 
         return {
-          itemIndex: index,
+          topicIndex: index,
           title: `Lesson ${index + 1}`,
           url,
           sourceUrl: `https://training.example/lesson/${index}`,
@@ -38,13 +38,13 @@ test("should stop a course after two denied lessons without requesting the third
       });
 
       await chrome.storage.session.set({
-        [`playlist-download:${id}`]: {
+        [`track-download:${id}`]: {
           title: "Playlist",
           outputFormat: "mp4",
-          playlistQualityPreference: "best",
+          trackQualityPreference: "best",
           subtitleDownloadPreference: "none",
           segmentConcurrency: 1,
-          completedItemIndices: [],
+          completedTopicIndices: [],
           items,
         },
       });
@@ -54,24 +54,22 @@ test("should stop a course after two denied lessons without requesting the third
 
     try {
       await page.goto(
-        `chrome-extension://${extensionId}/src/index.html?playlist=${courseId}`,
+        `chrome-extension://${extensionId}/src/index.html?track=${courseId}`,
       );
 
       await expect(page.locator("#message")).toHaveText(
-        "Playlist download paused: access denied",
+        "Track download paused: access denied",
         { timeout: 30000 },
       );
 
       const completed = await setupPage.evaluate(async (id) => {
-        const entry = await chrome.storage.session.get(
-          `playlist-download:${id}`,
-        );
+        const entry = await chrome.storage.session.get(`track-download:${id}`);
 
-        const plan = entry[`playlist-download:${id}`] as {
-          completedItemIndices: number[];
+        const plan = entry[`track-download:${id}`] as {
+          completedTopicIndices: number[];
         };
 
-        return plan.completedItemIndices;
+        return plan.completedTopicIndices;
       }, courseId);
 
       expect(completed).toEqual([]);

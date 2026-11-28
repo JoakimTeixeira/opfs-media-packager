@@ -4,14 +4,14 @@ Each page illustrates one decision from [Engineering Decisions](decisions.md). E
 
 - [Reusable rules](decision-examples/reusable-rules.md)
 
-- [Playlist scan pacing](decision-examples/playlist-scan-pacing.md)
+- [Track scan pacing](decision-examples/track-scan-pacing.md)
 
-- [Playlist queue outcomes](decision-examples/playlist-queue-outcomes.md)
+- [Track queue outcomes](decision-examples/track-queue-outcomes.md)
 
 - [Large downloads and checkpoints](decision-examples/large-downloads-and-checkpoints.md)
 
-- [Playlist download preferences](decision-examples/playlist-download-preferences.md)
+- [Track download preferences](decision-examples/track-download-preferences.md)
 
-- [Playlist page adapters](decision-examples/playlist-page-adapters.md)
+- [Track page adapters](decision-examples/track-page-adapters.md)
 
 - [Media access and credentials](decision-examples/media-access-and-credentials.md)

@@ -1,5 +1,5 @@
 import { sanitizeMarkdownText } from "./markdown-text.ts";
-import { stripRelatedContentSections } from "./item-markdown-artifacts.ts";
+import { stripRelatedContentSections } from "./topic-markdown-artifacts.ts";
 
 const PASTED_BULLET_LINE_PATTERN = /^[•▪▫◦‣⁃●○]\s+(.*)$/;
 
@@ -35,7 +35,7 @@ export function normalizePastedBulletLines(text: string): {
  * stripping invisible/control/PUA characters and converting pasted Unicode
  * bullet lines into standard `- ` Markdown items while preserving code fences.
  */
-export function cleanItemMarkdown(markdown: string): string {
+export function cleanTopicMarkdown(markdown: string): string {
   if (!markdown) return "";
 
   const fence = { active: false };

@@ -2,7 +2,7 @@
 
 OPFS Media Packager uses several test layers because a passing unit test does not prove that Chrome pages, downloaded files, or bundled extension files work together.
 
-New or changed test names should start with `should` and describe one observable behaviour. Some existing integration tests do not yet follow this convention. Tests use the same terms as the product: HLS manifest, video stream, subtitles, companion documents, playlist scan, playlist queue, and resume point.
+New or changed test names should start with `should` and describe one observable behaviour. Some existing integration tests do not yet follow this convention. Tests use the same terms as the product: HLS manifest, video stream, subtitles, companion documents, track scan, track queue, and resume point.
 
 ## Test layers
 
@@ -18,9 +18,9 @@ The test pyramid keeps most tests fast at the unit layer. Integration and browse
 
 Each TypeScript source file in `lib/` and `src/` has a colocated test file, run with Vitest. Cross-module tests live in feature folders under `tests/integration/`; contract tests under `tests/contract/` check packaging, security, and documentation agreements, while `tests/architecture/` checks dependency boundaries. All these test files run with Vitest. Browser flows live in `tests/e2e/` and run with Playwright. Coverage and mutation runs also use Vitest.
 
-Feature-specific `__fixtures__/` folders hold prepared test inputs. Feature-specific `__mocks__/` folders hold simulated dependencies, such as the playlist scan's mocked Chrome APIs. Shared browser lifecycle helpers live in `tests/e2e/support/`. These helpers use explicit imports; folder names do not enable automatic mocking in this project.
+Feature-specific `__fixtures__/` folders hold prepared test inputs. Feature-specific `__mocks__/` folders hold simulated dependencies, such as the track scan's mocked Chrome APIs. Shared browser lifecycle helpers live in `tests/e2e/support/`. These helpers use explicit imports; folder names do not enable automatic mocking in this project.
 
-Each source module owns its matching unit test file. Source-page tests replace browser dependencies with test doubles, and wider integration, contract, and browser tests exercise the connections between modules. Playlist scans exercise `background.ts`, `content.ts`, and `page-playlist-probe.ts`, while browser download and playlist flows exercise `app.ts`, `popup.ts`, and `playlist.ts`.
+Each source module owns its matching unit test file. Source-page tests replace browser dependencies with test doubles, and wider integration, contract, and browser tests exercise the connections between modules. Track scans exercise `background.ts`, `content.ts`, and `page-track-probe.ts`, while browser download and playlist flows exercise `app.ts`, `popup.ts`, and `track.ts`.
 
 ## Test techniques and intent
 
@@ -60,7 +60,7 @@ Each source module owns its matching unit test file. Source-page tests replace b
 - Start with a focused test around the rule that needs to change. This creates a safe seam in existing code before refactoring.
 - Assert visible behaviour and meaningful state. Avoid asserting private implementation details unless they enforce a security or browser contract.
 - Use local fake servers for network cases. They make authorization, rate-limit, retry, and timeout behaviour repeatable.
-- Cover the success path, cancellation, one-item failure, session-wide failure, and resume behaviour for a playlist queue.
+- Cover the success path, cancellation, one-item failure, session-wide failure, and resume behaviour for a track queue.
 - Add a browser test when a change crosses extension pages, Chrome APIs, or a real download flow.
 - Run mutation testing after changing protected logic. A surviving mutant means the test suite did not detect a plausible bug.
 
@@ -80,13 +80,13 @@ The lint configuration also enforces the Object Calisthenics profile used by thi
 | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
 | Does a browser page accept untrusted data safely?                              | Security and message tests in `tests/`, the contract suite, and [security controls](../SECURITY.md).                     |
 | Does an HLS download preserve segment order and recover after an interruption? | Segment and checkpoint tests in `tests/`, local integration tests, and browser download flows.                           |
-| Does a playlist scan respect host request limits?                              | Playlist-probe integration tests cover one request in flight, `Retry-After`, and the repeated-429 circuit breaker.       |
+| Does a track scan respect host request limits?                                 | Playlist-probe integration tests cover one request in flight, `Retry-After`, and the repeated-429 circuit breaker.       |
 | Can an implementation change evade the tests?                                  | `npm run test:mutation` requires Stryker to report zero surviving mutants in protected modules.                          |
 | Can a packaging or documentation change break the extension?                   | The contract suite checks the manifest, built files, HTML, security requirements, anonymization, and documentation size. |
 
 For a review, start with `npm run verify`. Run `npm run test:mutation` when core rules, security boundaries, queue transitions, or retry behaviour change. Keep the command output or continuous-integration record with the release evidence.
 
-Coverage thresholds apply to production modules in `lib/`, excluding colocated test files. They do not measure `src/app.ts`, `src/background.ts`, or `src/page-playlist-probe.ts`. Mutation testing covers the modules explicitly listed in [stryker.config.mjs](../stryker.config.mjs). Passing a coverage threshold or a mutation run does not prove that every behaviour is correct.
+Coverage thresholds apply to production modules in `lib/`, excluding colocated test files. They do not measure `src/app.ts`, `src/background.ts`, or `src/page-track-probe.ts`. Mutation testing covers the modules explicitly listed in [stryker.config.mjs](../stryker.config.mjs). Passing a coverage threshold or a mutation run does not prove that every behaviour is correct.
 
 The current browser suite uses local test media and simulated sites. It does not establish compatibility with every real site or prove audio and video synchronization across every player. When modifying packaging, inspect a representative output file and record the media format, duration and subtitle behaviour.
 

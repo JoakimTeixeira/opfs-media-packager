@@ -1,7 +1,4 @@
-import {
-  isApiPlaylistPage,
-  isPlaylistPage,
-} from "../playlist/playlist-adapters.ts";
+import { isApiTrackPage, isTrackPage } from "../track/track-adapters.ts";
 import {
   outputFormatOrDefault,
   type OutputFormat,
@@ -77,7 +74,7 @@ export function isTrustedExtensionSender(
   );
 }
 
-export function isTrustedApiPlaylistSender(
+export function isTrustedApiTrackSender(
   sender: ExternalValue,
   extensionId: string,
 ): boolean {
@@ -88,11 +85,11 @@ export function isTrustedApiPlaylistSender(
   return (
     record.id === extensionId &&
     record.frameId === 0 &&
-    isApiPlaylistPage(record.url)
+    isApiTrackPage(record.url)
   );
 }
 
-export function isTrustedPlaylistSender(
+export function isTrustedTrackSender(
   sender: ExternalValue,
   extensionId: string,
 ): boolean {
@@ -101,14 +98,14 @@ export function isTrustedPlaylistSender(
   if (!record) return false;
   if (record.id !== extensionId || record.frameId !== 0) return false;
 
-  return isPlaylistPage(record.url);
+  return isTrackPage(record.url);
 }
 
 /**
  * Accepts trusted playlist-page frames, including hidden same-origin probe
  * iframes created during headless playlist scanning.
  */
-export function isTrustedPlaylistFrameSender(
+export function isTrustedTrackFrameSender(
   sender: ExternalValue,
   extensionId: string,
 ): boolean {
@@ -120,7 +117,7 @@ export function isTrustedPlaylistFrameSender(
     return false;
   }
 
-  return isPlaylistPage(record.url);
+  return isTrackPage(record.url);
 }
 
 function validatedRequestSubtitle(

@@ -1,18 +1,18 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
 import {
-  PLAYLIST_DOWNLOAD_MODE_OPTIONS,
-  DEFAULT_PLAYLIST_DOWNLOAD_MODE,
+  TRACK_DOWNLOAD_MODE_OPTIONS,
+  DEFAULT_TRACK_DOWNLOAD_MODE,
   DEFAULT_DOWNLOAD_PREFERENCES,
   OUTPUT_FORMAT_OPTIONS,
   SEGMENT_CONCURRENCY_OPTIONS,
-  playlistDownloadModeOrDefault,
-  playlistQualityPreferenceFromLabel,
-  playlistQualityPreferenceOrDefault,
+  trackDownloadModeOrDefault,
+  trackQualityPreferenceFromLabel,
+  trackQualityPreferenceOrDefault,
   outputFormatOrDefault,
   renderPreferenceOptions,
   subtitleDownloadPreferenceOrDefault,
-  type PlaylistDownloadMode,
+  type TrackDownloadMode,
 } from "./download-preferences.ts";
 
 class FakeOption {
@@ -28,22 +28,22 @@ class FakeOption {
 test("should normalize output, course quality, download mode, and subtitle preferences with safe defaults", () => {
   assert.equal(outputFormatOrDefault("mkv"), "mkv");
   assert.equal(outputFormatOrDefault("invalid"), "mp4");
-  assert.equal(playlistQualityPreferenceOrDefault("smallest"), "smallest");
-  assert.equal(playlistQualityPreferenceOrDefault("other"), "best");
+  assert.equal(trackQualityPreferenceOrDefault("smallest"), "smallest");
+  assert.equal(trackQualityPreferenceOrDefault("other"), "best");
   assert.equal(subtitleDownloadPreferenceOrDefault("none"), "none");
   assert.equal(subtitleDownloadPreferenceOrDefault("other"), "include");
-  const defaultMode: PlaylistDownloadMode = DEFAULT_PLAYLIST_DOWNLOAD_MODE;
+  const defaultMode: TrackDownloadMode = DEFAULT_TRACK_DOWNLOAD_MODE;
 
   assert.equal(defaultMode, "all");
-  assert.equal(DEFAULT_DOWNLOAD_PREFERENCES.playlistDownloadMode, "all");
-  assert.equal(playlistDownloadModeOrDefault("all"), "all");
-  assert.equal(playlistDownloadModeOrDefault("videos"), "videos");
-  assert.equal(playlistDownloadModeOrDefault("documents"), "documents");
-  assert.equal(playlistDownloadModeOrDefault("invalid"), "all");
-  assert.equal(playlistDownloadModeOrDefault(null), "all");
-  assert.equal(playlistQualityPreferenceFromLabel("1080p (1920×1080)"), "1080");
-  assert.equal(playlistQualityPreferenceFromLabel("720p"), "720");
-  assert.equal(playlistQualityPreferenceFromLabel("1200 kbps"), "");
+  assert.equal(DEFAULT_DOWNLOAD_PREFERENCES.trackDownloadMode, "all");
+  assert.equal(trackDownloadModeOrDefault("all"), "all");
+  assert.equal(trackDownloadModeOrDefault("videos"), "videos");
+  assert.equal(trackDownloadModeOrDefault("documents"), "documents");
+  assert.equal(trackDownloadModeOrDefault("invalid"), "all");
+  assert.equal(trackDownloadModeOrDefault(null), "all");
+  assert.equal(trackQualityPreferenceFromLabel("1080p (1920×1080)"), "1080");
+  assert.equal(trackQualityPreferenceFromLabel("720p"), "720");
+  assert.equal(trackQualityPreferenceFromLabel("1200 kbps"), "");
 });
 
 test("should share stable output, course download mode, and concurrency preferences", () => {
@@ -52,7 +52,7 @@ test("should share stable output, course download mode, and concurrency preferen
     { label: "MKV + embedded subtitle", value: "mkv" },
   ]);
 
-  assert.deepEqual(PLAYLIST_DOWNLOAD_MODE_OPTIONS, [
+  assert.deepEqual(TRACK_DOWNLOAD_MODE_OPTIONS, [
     { label: "Videos + subtitles + companion documents", value: "all" },
     { label: "Videos + subtitles only", value: "videos" },
     {

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Track · OPFS Media Packager</title>
+    <link rel="stylesheet" href="track.css" />
+  </head>
+  <body>
+    <header><strong>OPFS Media Packager</strong><span>Track</span></header>
+    <main>
+      <p class="eyebrow">Signed-in track scan</p>
+      <h1 id="title">Checking track streams…</h1>
+      <p id="summary">
+        The extension opens each topic in the background and keeps only topics
+        that request an HLS stream.
+      </p>
+      <section class="progress">
+        <strong id="progress-label">Preparing…</strong
+        ><progress id="progress" value="0" max="1"></progress>
+      </section>
+      <section class="options" aria-label="Track download preferences">
+        <div class="option-heading">
+          <strong>Download preferences</strong>
+          <span>Applied to every included topic</span>
+        </div>
+        <div class="option-grid">
+          <label for="track-download-mode" class="full-option"
+            >Download content
+            <select id="track-download-mode"></select>
+          </label>
+          <label for="format"
+            >Format
+            <select id="format"></select>
+          </label>
+          <label for="track-quality"
+            >Quality
+            <select id="track-quality">
+              <option value="best">Best available</option>
+              <option value="1080">Up to 1080p</option>
+              <option value="720">Up to 720p</option>
+              <option value="480">Up to 480p</option>
+              <option value="smallest">Smallest available</option>
+            </select>
+          </label>
+          <label for="subtitle-mode"
+            >Subtitles
+            <select id="subtitle-mode">
+              <option value="include">Include when detected</option>
+              <option value="none">Do not download subtitles</option>
+            </select>
+          </label>
+          <label for="segment-concurrency"
+            >Parallel segments
+            <select id="segment-concurrency"></select>
+          </label>
+        </div>
+        <p id="preferences-note">
+          Your choices are remembered for the next download.
+        </p>
+        <button id="download-all" disabled>Download selected topics</button>
+      </section>
+      <section class="selection-bar" aria-label="Topic selection">
+        <span id="selection-count">0 selected</span>
+        <div class="selection-actions">
+          <button id="select-all" type="button" class="secondary" disabled>
+            Select all
+          </button>
+          <button id="deselect-all" type="button" class="secondary" disabled>
+            Deselect all
+          </button>
+        </div>
+      </section>
+      <ol id="topics"></ol>
+    </main>
+    <script type="module" src="../dist/track.js"></script>
+  </body>
+</html>

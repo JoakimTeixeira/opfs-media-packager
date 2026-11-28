@@ -1,4 +1,4 @@
-import type { TiptapNode } from "../item-markdown.ts";
+import type { TiptapNode } from "../topic-markdown.ts";
 
 export const pastedBulletDoc: TiptapNode = {
   type: "doc",

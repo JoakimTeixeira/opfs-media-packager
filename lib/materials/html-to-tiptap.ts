@@ -1,5 +1,5 @@
 import { safeMarkdownHref } from "./markdown-links.ts";
-import type { TiptapMark, TiptapNode } from "./item-markdown.ts";
+import type { TiptapMark, TiptapNode } from "./topic-markdown.ts";
 import type { HtmlChild, HtmlElementNode } from "./html-tree.ts";
 
 const BLOCK_HTML_TAGS = new Set([
@@ -142,9 +142,9 @@ function buildListTiptapNode(
 
     if (child.tag === "ul" || child.tag === "ol") {
       const nested = buildListTiptapNode(child, pageUrl);
-      const lastItem = items[items.length - 1];
+      const lastTopic = items[items.length - 1];
 
-      if (lastItem) lastItem.content.push(nested);
+      if (lastTopic) lastTopic.content.push(nested);
     }
   }
 

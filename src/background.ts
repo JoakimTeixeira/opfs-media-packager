@@ -19,15 +19,15 @@ import {
   isTranscriptMetadataUrl,
 } from "../lib/subtitles/subtitle-tracks.ts";
 import {
-  countItemCompanionDocuments,
+  countTopicCompanionDocuments,
   isExcalidrawUrl,
-  isItemDownloadableForMode,
-  mergeItemCompanionDocuments,
-  type ItemFileAsset,
-  type ItemLinkAsset,
-  type ItemMarkdownNote,
-  type ItemCompanionDocuments,
-} from "../lib/materials/item-assets.ts";
+  isTopicDownloadableForMode,
+  mergeTopicCompanionDocuments,
+  type TopicFileAsset,
+  type TopicLinkAsset,
+  type TopicMarkdownNote,
+  type TopicCompanionDocuments,
+} from "../lib/materials/topic-assets.ts";
 import {
   buildPdfFromJpegPages,
   jpegDimensions,
@@ -43,10 +43,10 @@ import {
   masterUrlForDetectedPlaylist,
 } from "../lib/media/player-adapters.ts";
 import {
-  usablePlaylistItems,
-  type PlaylistItemInput,
-  type UsablePlaylistItem,
-} from "../lib/playlist/playlist-plan.ts";
+  usableTrackTopics,
+  type TrackTopicInput,
+  type UsableTrackTopic,
+} from "../lib/track/track-plan.ts";
 import { createMediaRequest } from "../lib/media/media-request.ts";
 import {
   clampConcurrency,
@@ -59,8 +59,8 @@ import {
 } from "../lib/security/security.ts";
 import {
   isTrustedExtensionSender,
-  isTrustedPlaylistSender,
-  isTrustedPlaylistFrameSender,
+  isTrustedTrackSender,
+  isTrustedTrackFrameSender,
   validatedDownloadRequest,
   type ValidatedDownloadRequest,
 } from "../lib/security/extension-messages.ts";
@@ -76,21 +76,18 @@ import {
 import { isSupplementaryLinkedPostUrl } from "../lib/materials/linked-video.ts";
 import { mergeDetectedStreams } from "../lib/media/stream-collection.ts";
 import { playlistMediaAuthorizationRule } from "../lib/media/media-authorization.ts";
-import {
-  isApiPlaylistPage,
-  isPlaylistPage,
-} from "../lib/playlist/playlist-adapters.ts";
+import { isApiTrackPage, isTrackPage } from "../lib/track/track-adapters.ts";
 import {
   DEFAULT_DOWNLOAD_PREFERENCES,
-  playlistDownloadModeOrDefault,
-  playlistQualityPreferenceOrDefault,
+  trackDownloadModeOrDefault,
+  trackQualityPreferenceOrDefault,
   outputFormatOrDefault,
   subtitleDownloadPreferenceOrDefault,
 } from "../lib/downloads/download-preferences.ts";
 
 type TimerHandle = ReturnType<typeof setTimeout>;
 
-type PlaylistItem = UsablePlaylistItem;
+type TrackTopic = UsableTrackTopic;
 
 type RuntimeMessageResponse = (response?: unknown) => void;
 
@@ -117,7 +114,7 @@ type SubtitleCandidate =
       readonly label?: unknown;
     };
 
-interface ItemExtraVideo {
+interface TopicExtraVideo {
   readonly key: string;
   readonly url: string;
   readonly host: string;
@@ -128,19 +125,19 @@ interface ItemExtraVideo {
   readonly subtitles: readonly SubtitleTrack[];
 }
 
-interface ProbedStream extends ItemExtraVideo {
+interface ProbedStream extends TopicExtraVideo {
   readonly detectedAt: number;
   readonly folderPath?: readonly string[];
-  readonly itemIndex?: number;
+  readonly topicIndex?: number;
   readonly linkedTitle?: string;
   readonly primaryVideoTitle?: string;
-  readonly extraVideos?: readonly ItemExtraVideo[];
-  readonly documents?: ItemCompanionDocuments;
+  readonly extraVideos?: readonly TopicExtraVideo[];
+  readonly documents?: TopicCompanionDocuments;
 }
 
-interface DiscoveredItemStream extends ProbedStream {
+interface DiscoveredTopicStream extends ProbedStream {
   readonly folderPath: readonly string[];
-  readonly itemIndex: number;
+  readonly topicIndex: number;
 }
 
 interface StoredStreamRecord extends ProbedStream {
@@ -153,20 +150,20 @@ interface TabDetectionState {
   subtitles: SubtitleTrack[];
 }
 
-interface PlaylistScan {
+interface TrackScan {
   readonly id: string;
   readonly title: string;
-  readonly items: readonly PlaylistItem[];
-  readonly discovered: readonly DiscoveredItemStream[];
-  readonly nextItemIndex: number;
-  readonly currentItemIndex: number | null;
+  readonly items: readonly TrackTopic[];
+  readonly discovered: readonly DiscoveredTopicStream[];
+  readonly nextTopicIndex: number;
+  readonly currentTopicIndex: number | null;
   readonly status: "scanning" | "ready";
   readonly rateLimited?: boolean;
   readonly sourceTabId?: number | null;
   readonly startedAt: number;
 }
 
-interface PlaylistStreamSignal {
+interface TrackStreamSignal {
   readonly url?: unknown;
   readonly mediaUrl?: unknown;
   readonly subtitles?: readonly SubtitleCandidate[];
@@ -188,12 +185,12 @@ interface PendingPageMediaRequest {
 }
 
 interface ProbeJob {
-  readonly itemIndex: number;
+  readonly topicIndex: number;
   readonly rawUrl: string;
   readonly subtitles: readonly SubtitleCandidate[];
   readonly linkedTitle: string;
   readonly sourceUrl: string;
-  readonly documents?: ItemCompanionDocuments;
+  readonly documents?: TopicCompanionDocuments;
   readonly partial?: boolean;
 }
 
@@ -202,9 +199,9 @@ interface ActiveHeadlessProbe {
   readonly tabId: number;
   readonly frameId: number;
   timeout: TimerHandle | null;
-  readonly onItem: (
-    itemIndex: number,
-    stream: PlaylistStreamSignal | null,
+  readonly onTopic: (
+    topicIndex: number,
+    stream: TrackStreamSignal | null,
     partial?: boolean,
   ) => void;
   readonly onDone: (
@@ -215,7 +212,7 @@ interface ActiveHeadlessProbe {
   ) => void;
 }
 
-interface PlaylistProbeAttemptResult {
+interface TrackProbeAttemptResult {
   readonly ok: boolean;
   readonly needsInject: boolean;
   readonly rateLimited: boolean;
@@ -224,7 +221,7 @@ interface PlaylistProbeAttemptResult {
   readonly unresolvedLinkLists: Record<string, readonly string[]>;
 }
 
-interface PlaylistProbeResult {
+interface TrackProbeResult {
   readonly ok: boolean;
   readonly rateLimited: boolean;
   readonly unresolvedIndices: number[];
@@ -240,9 +237,9 @@ interface PendingHiddenFrame {
 
 interface HiddenFrameProbe {
   readonly scanId: string;
-  readonly itemIndex: number;
+  readonly topicIndex: number;
   readonly sourceUrl: string;
-  readonly itemTitle: string;
+  readonly topicTitle: string;
   readonly ruleId: number;
   readonly onStream: (stream: ProbedStream) => void;
   readonly onSubtitles: (tracks: readonly SubtitleTrack[]) => void;
@@ -253,7 +250,7 @@ interface HiddenFrameHandle {
   readonly frameId: number;
 }
 
-interface HiddenFrameItemOutcome {
+interface HiddenFrameTopicOutcome {
   readonly captured: boolean;
   readonly streamKey: string;
   readonly linkedUrl?: string;
@@ -263,8 +260,8 @@ interface HiddenFrameObservationOptions {
   readonly scanId: string;
   readonly sourceTabId: number;
   readonly frameId: number;
-  readonly itemIndex: number;
-  readonly item: PlaylistItem;
+  readonly topicIndex: number;
+  readonly item: TrackTopic;
   readonly targetUrl: string;
   readonly isLinkedVideo: boolean;
   readonly previousStreamKey: string;
@@ -283,8 +280,8 @@ interface FinalizeHiddenFrameContext extends HiddenFrameObservationOptions {
 interface OpenHiddenIframeOptions {
   readonly scanId: string;
   readonly sourceTabId: number;
-  readonly itemIndex: number;
-  readonly item: PlaylistItem;
+  readonly topicIndex: number;
+  readonly item: TrackTopic;
   readonly targetUrl: string;
   readonly isLinkedVideo: boolean;
   readonly navigateSidebar?: boolean;
@@ -294,24 +291,24 @@ interface OpenHiddenIframeOptions {
   readonly linkedPostMode?: boolean;
 }
 
-interface StepSidebarItemInput {
+interface StepSidebarTopicInput {
   readonly scanId: string;
   readonly sourceTabId: number;
   readonly sourceOrigin: string;
   readonly primaryFrame: HiddenFrameHandle;
-  readonly itemIndex: number;
-  readonly item: PlaylistItem;
+  readonly topicIndex: number;
+  readonly item: TrackTopic;
   readonly linkedUrls: readonly string[];
   readonly previousStreamKey: string;
 }
 
-interface StepSidebarItemsContext {
+interface StepSidebarTopicsContext {
   readonly scanId: string;
   readonly sourceTabId: number;
   readonly sourceOrigin: string;
-  readonly scan: PlaylistScan;
+  readonly scan: TrackScan;
   readonly primaryFrame: HiddenFrameHandle;
-  readonly itemIndices: readonly number[];
+  readonly topicIndices: readonly number[];
   readonly unresolvedLinks: Readonly<Record<string, string>>;
   readonly unresolvedLinkLists: Readonly<Record<string, readonly string[]>>;
   readonly initialStreamKey: string;
@@ -320,8 +317,8 @@ interface StepSidebarItemsContext {
 interface ParallelHiddenIframeContext {
   readonly scanId: string;
   readonly sourceTabId: number;
-  readonly scan: PlaylistScan;
-  readonly itemIndices: readonly number[];
+  readonly scan: TrackScan;
+  readonly topicIndices: readonly number[];
   readonly unresolvedLinks: Readonly<Record<string, string>>;
   readonly unresolvedLinkLists: Readonly<Record<string, readonly string[]>>;
 }
@@ -339,10 +336,10 @@ interface WorkerTabProbe {
   readonly unresolvedLinks: Record<string, string>;
   readonly queue: readonly number[];
   readonly queuePos: number;
-  readonly itemIndex: number;
+  readonly topicIndex: number;
   readonly navigationIndex: number | null;
-  readonly itemTitle: string;
-  readonly itemSection: string;
+  readonly topicTitle: string;
+  readonly topicSection: string;
   readonly linkedTitle: string;
   readonly navigated: boolean;
   readonly navigationStarted: boolean;
@@ -358,13 +355,13 @@ interface WorkerTabProbe {
 }
 
 const stateKey = (tabId: number): string => `detections:${tabId}`;
-const outlineKey = (tabId: number): string => `playlist-outline:${tabId}`;
-const playlistKey = (scanId: string): string => `playlist-scan:${scanId}`;
-const probeKey = (tabId: number): string => `playlist-probe:${tabId}`;
+const outlineKey = (tabId: number): string => `track-outline:${tabId}`;
+const playlistKey = (scanId: string): string => `track-scan:${scanId}`;
+const probeKey = (tabId: number): string => `track-probe:${tabId}`;
 const mediaAuthorizationRuleId = 910001;
 const pageMediaRequests = new Map<string, PendingPageMediaRequest>();
 const pendingDownloadTargets = new Map<string, string>();
-const scanWriteQueues = new Map<string, Promise<PlaylistScan | null>>();
+const scanWriteQueues = new Map<string, Promise<TrackScan | null>>();
 const activeHeadlessProbes = new Map<string, ActiveHeadlessProbe>();
 const workerEarlyExitTimers = new Map<number, TimerHandle>();
 const activeScanWorkerTabs = new Map<string, Set<number>>();
@@ -468,7 +465,7 @@ function isSafeDownloadTarget(value: ExternalValue): value is string {
   );
 }
 
-async function fetchFromPlaylistPage(
+async function fetchFromTrackPage(
   tabId: number,
   url: string,
   responseType: "text" | "bytes",
@@ -477,8 +474,8 @@ async function fetchFromPlaylistPage(
   const safeUrl = safeMediaUrl(url);
   const tab = await chrome.tabs.get(tabId).catch(() => null);
 
-  if (!safeUrl || !isPlaylistPage(tab?.url)) {
-    throw new Error("The signed-in playlist tab is no longer available.");
+  if (!safeUrl || !isTrackPage(tab?.url)) {
+    throw new Error("The signed-in track tab is no longer available.");
   }
 
   const requestId = crypto.randomUUID();
@@ -486,7 +483,7 @@ async function fetchFromPlaylistPage(
   return new Promise<PageMediaResponse>((resolve, reject) => {
     const timeout = setTimeout(() => {
       pageMediaRequests.delete(requestId);
-      reject(new Error("The signed-in playlist tab did not respond."));
+      reject(new Error("The signed-in track tab did not respond."));
     }, timeoutMs);
 
     pageMediaRequests.set(requestId, { resolve, reject, timeout, tabId });
@@ -530,9 +527,9 @@ async function fetchSubtitleText(
     return decodeSubtitleBytes(new Uint8Array(await response.arrayBuffer()));
   }
 
-  if (!validTabId(sourceTabId) || !isPlaylistPage(sourceUrl)) return "";
+  if (!validTabId(sourceTabId) || !isTrackPage(sourceUrl)) return "";
 
-  const pageResponse = await fetchFromPlaylistPage(
+  const pageResponse = await fetchFromTrackPage(
     sourceTabId,
     safeUrl,
     "bytes",
@@ -846,13 +843,13 @@ async function refreshStoredQualityOptions(
   return refreshedState;
 }
 
-async function getPlaylistScan(scanId: string): Promise<PlaylistScan | null> {
+async function getTrackScan(scanId: string): Promise<TrackScan | null> {
   const stored = await chrome.storage.session.get(playlistKey(scanId));
 
-  return (stored[playlistKey(scanId)] as PlaylistScan | undefined) || null;
+  return (stored[playlistKey(scanId)] as TrackScan | undefined) || null;
 }
 
-async function setPlaylistScan(scan: PlaylistScan): Promise<void> {
+async function setTrackScan(scan: TrackScan): Promise<void> {
   await chrome.storage.session.set({ [playlistKey(scan.id)]: scan });
 }
 
@@ -863,26 +860,26 @@ async function getTabProbe(tabId: number): Promise<WorkerTabProbe | null> {
 }
 
 /**
- * Serializes immutable updates to one PlaylistScan so parallel headless workers
+ * Serializes immutable updates to one TrackScan so parallel headless workers
  * never overwrite each other's discovered items.
  */
-function updatePlaylistScan(
+function updateTrackScan(
   scanId: string,
-  transform: (scan: PlaylistScan) => PlaylistScan | null,
-): Promise<PlaylistScan | null> {
+  transform: (scan: TrackScan) => TrackScan | null,
+): Promise<TrackScan | null> {
   const previous =
-    scanWriteQueues.get(scanId) || Promise.resolve<PlaylistScan | null>(null);
+    scanWriteQueues.get(scanId) || Promise.resolve<TrackScan | null>(null);
 
   const next = previous
     .catch(() => null)
-    .then(async (): Promise<PlaylistScan | null> => {
-      const scan = await getPlaylistScan(scanId);
+    .then(async (): Promise<TrackScan | null> => {
+      const scan = await getTrackScan(scanId);
 
       if (!scan) return null;
       const updated = transform(scan);
 
       if (!updated) return scan;
-      await setPlaylistScan(updated);
+      await setTrackScan(updated);
 
       return updated;
     });
@@ -892,28 +889,29 @@ function updatePlaylistScan(
   return next;
 }
 
-function incrementCheckedItemCount(
-  scanId: string,
-): Promise<PlaylistScan | null> {
-  return updatePlaylistScan(scanId, (current) =>
+function incrementCheckedTopicCount(scanId: string): Promise<TrackScan | null> {
+  return updateTrackScan(scanId, (current) =>
     Object.freeze({
       ...current,
-      nextItemIndex: Math.min(current.items.length, current.nextItemIndex + 1),
+      nextTopicIndex: Math.min(
+        current.items.length,
+        current.nextTopicIndex + 1,
+      ),
     }),
   );
 }
 
-function markPlaylistScanReady(
+function markTrackScanReady(
   scanId: string,
   rateLimited = false,
-): Promise<PlaylistScan | null> {
-  return updatePlaylistScan(scanId, (current) =>
+): Promise<TrackScan | null> {
+  return updateTrackScan(scanId, (current) =>
     Object.freeze({
       ...current,
       status: "ready" as const,
       rateLimited: Boolean(rateLimited),
-      nextItemIndex: current.items.length,
-      currentItemIndex: null,
+      nextTopicIndex: current.items.length,
+      currentTopicIndex: null,
     }),
   );
 }
@@ -960,7 +958,7 @@ async function inspectAuthorizedPlaylist(
     }
   }
 
-  if (validTabId(sourceTabId) && isPlaylistPage(sourceUrl)) {
+  if (validTabId(sourceTabId) && isTrackPage(sourceUrl)) {
     try {
       const metadata = await inspectPlaylist(
         candidateUrl,
@@ -1084,7 +1082,7 @@ async function buildProbedStream(
       key: streamIdentity(safeBase) || safeBase,
       url: safeBase,
       host: new URL(safeBase).host,
-      title: "Playlist stream",
+      title: "Track stream",
       sourceUrl,
       kind: "direct" as const,
       qualityOptions: Object.freeze([
@@ -1136,7 +1134,7 @@ async function buildProbedStream(
     key: streamIdentity(playlistUrl) || playlistUrl,
     url: playlistUrl,
     host: new URL(playlistUrl).host,
-    title: "Playlist stream",
+    title: "Track stream",
     sourceUrl,
     kind: metadata.isMaster ? ("master" as const) : ("media" as const),
     qualityOptions,
@@ -1148,13 +1146,13 @@ async function buildProbedStream(
 function validatedFileAssets(
   value: ExternalValue,
   kind: "image" | "pdf",
-): readonly ItemFileAsset[] {
+): readonly TopicFileAsset[] {
   if (!Array.isArray(value)) return Object.freeze([]);
 
   const defaultFilename = kind === "pdf" ? "document.pdf" : "image.png";
 
   return Object.freeze(
-    value.slice(0, 100).flatMap((entry): ItemFileAsset[] => {
+    value.slice(0, 100).flatMap((entry): TopicFileAsset[] => {
       const record = externalRecord(entry);
       const url = safeMediaUrl(record?.url);
 
@@ -1182,13 +1180,13 @@ function validatedFileAssets(
 function validatedLinkAssets(
   value: ExternalValue,
   kind: "diagram" | "slides",
-): readonly ItemLinkAsset[] {
+): readonly TopicLinkAsset[] {
   if (!Array.isArray(value)) return Object.freeze([]);
 
   const defaultTitle = kind === "diagram" ? "Excalidraw diagram" : "Slides";
 
   return Object.freeze(
-    value.slice(0, 100).flatMap((entry): ItemLinkAsset[] => {
+    value.slice(0, 100).flatMap((entry): TopicLinkAsset[] => {
       const record = externalRecord(entry);
       const url = safeMediaUrl(record?.url);
 
@@ -1202,11 +1200,11 @@ function validatedLinkAssets(
 
 function validatedExtraNotes(
   value: ExternalValue,
-): readonly ItemMarkdownNote[] {
+): readonly TopicMarkdownNote[] {
   if (!Array.isArray(value)) return Object.freeze([]);
 
   return Object.freeze(
-    value.slice(0, 20).flatMap((entry): ItemMarkdownNote[] => {
+    value.slice(0, 20).flatMap((entry): TopicMarkdownNote[] => {
       const record = externalRecord(entry);
 
       const markdown =
@@ -1231,7 +1229,7 @@ function validatedExtraNotes(
 
 function validatedDocumentsRecord(
   value: ExternalValue,
-): ItemCompanionDocuments | undefined {
+): TopicCompanionDocuments | undefined {
   const record = externalRecord(value);
 
   if (!record) return undefined;
@@ -1243,7 +1241,7 @@ function validatedDocumentsRecord(
 
   const extraNotes = validatedExtraNotes(record.extraNotes);
 
-  const documents: ItemCompanionDocuments = Object.freeze({
+  const documents: TopicCompanionDocuments = Object.freeze({
     markdown,
     images: validatedFileAssets(record.images, "image"),
     pdfs: validatedFileAssets(record.pdfs, "pdf"),
@@ -1252,20 +1250,20 @@ function validatedDocumentsRecord(
     ...(extraNotes.length ? { extraNotes } : {}),
   });
 
-  return countItemCompanionDocuments(documents) > 0 ? documents : undefined;
+  return countTopicCompanionDocuments(documents) > 0 ? documents : undefined;
 }
 
 function documentsOnlyStream(
-  itemIndex: number,
+  topicIndex: number,
   sourceUrl: string,
-  documents: ItemCompanionDocuments,
+  documents: TopicCompanionDocuments,
   linkedTitle = "",
 ): ProbedStream {
   return Object.freeze({
-    key: `documents:${itemIndex}`,
+    key: `documents:${topicIndex}`,
     url: "",
     host: "",
-    title: "Item documents",
+    title: "Topic documents",
     sourceUrl,
     kind: "media" as const,
     qualityOptions: Object.freeze([]),
@@ -1279,10 +1277,10 @@ function documentsOnlyStream(
 async function extractFrameDocuments(
   tabId: number,
   frameId = 0,
-): Promise<ItemCompanionDocuments | undefined> {
+): Promise<TopicCompanionDocuments | undefined> {
   const response = externalRecord(
     await chrome.tabs
-      .sendMessage(tabId, { type: "extract-item-documents" }, { frameId })
+      .sendMessage(tabId, { type: "extract-topic-documents" }, { frameId })
       .catch(() => null),
   );
 
@@ -1301,14 +1299,14 @@ function cleanLinkedTitle(rawTitle: string): string {
  * Combines a item's numeric order prefix (e.g. "3.8 ") with a linked video's
  * own title when the item points to an external/linked video post.
  */
-function resolvedItemTitle(
-  itemFileTitle: string,
+function resolvedTopicTitle(
+  topicFileTitle: string,
   linkedTitle?: string,
 ): string {
   const cleanedLinked = cleanLinkedTitle(linkedTitle || "");
 
-  if (!cleanedLinked) return itemFileTitle;
-  const prefix = /^(\d+\.\d+\s+)/.exec(itemFileTitle)?.[1] || "";
+  if (!cleanedLinked) return topicFileTitle;
+  const prefix = /^(\d+\.\d+\s+)/.exec(topicFileTitle)?.[1] || "";
 
   return `${prefix}${cleanedLinked}`;
 }
@@ -1316,7 +1314,7 @@ function resolvedItemTitle(
 function toExtraVideoEntry(
   stream: ProbedStream,
   title: string,
-): ItemExtraVideo {
+): TopicExtraVideo {
   return Object.freeze({
     key: stream.key,
     url: stream.url,
@@ -1330,11 +1328,11 @@ function toExtraVideoEntry(
 }
 
 function appendUniqueExtraVideo(
-  existing: readonly ItemExtraVideo[],
+  existing: readonly TopicExtraVideo[],
   incoming: ProbedStream,
   incomingTitle: string,
   primaryIdentity: string,
-): readonly ItemExtraVideo[] {
+): readonly TopicExtraVideo[] {
   const incomingIdentity = streamIdentity(incoming.url) || incoming.key;
 
   if (!incoming.url || incomingIdentity === primaryIdentity) return existing;
@@ -1356,7 +1354,7 @@ function appendUniqueExtraVideo(
 function mergeDistinctExtraVideoStream(
   current: ProbedStream,
   incoming: ProbedStream,
-  documents: ItemCompanionDocuments | undefined,
+  documents: TopicCompanionDocuments | undefined,
   primaryIdentity: string,
   options: {
     readonly primaryTitleForSplit?: string;
@@ -1396,7 +1394,7 @@ function mergeCapturedStream(
 ): ProbedStream {
   if (!current) return incoming;
 
-  const documents = mergeItemCompanionDocuments(
+  const documents = mergeTopicCompanionDocuments(
     current.documents,
     incoming.documents,
     options?.secondaryAsExtraNote
@@ -1456,18 +1454,18 @@ function mergeCapturedStream(
 }
 
 function resolvedEntryTitle(
-  itemFileTitle: string,
+  topicFileTitle: string,
   previousTitle: string | undefined,
   streamLinkedTitle: string | undefined,
   hasExtraVideos: boolean,
 ): string {
-  if (hasExtraVideos) return itemFileTitle;
+  if (hasExtraVideos) return topicFileTitle;
 
   if (streamLinkedTitle) {
-    return resolvedItemTitle(itemFileTitle, streamLinkedTitle);
+    return resolvedTopicTitle(topicFileTitle, streamLinkedTitle);
   }
 
-  return previousTitle || itemFileTitle;
+  return previousTitle || topicFileTitle;
 }
 
 /**
@@ -1475,9 +1473,9 @@ function resolvedEntryTitle(
  * preserving previously discovered master URLs, subtitles, qualities, and
  * extra linked posts or videos on merge.
  */
-async function storeDiscoveredItem(
+async function storeDiscoveredTopic(
   scanId: string,
-  itemIndex: number,
+  topicIndex: number,
   stream: ProbedStream,
   countChecked = false,
   options?: {
@@ -1485,19 +1483,19 @@ async function storeDiscoveredItem(
     readonly linkedPostMode?: boolean;
   },
 ): Promise<void> {
-  await updatePlaylistScan(scanId, (scan) => {
-    const item = scan.items?.[itemIndex];
+  await updateTrackScan(scanId, (scan) => {
+    const item = scan.items?.[topicIndex];
 
     if (!item || scan.status !== "scanning") return null;
 
     const previous = scan.discovered.find(
-      (discovered) => discovered.itemIndex === itemIndex,
+      (discovered) => discovered.topicIndex === topicIndex,
     );
 
     const noteTitle = cleanLinkedTitle(stream.linkedTitle || "") || "Post";
 
     const incomingVideoTitle = stream.linkedTitle
-      ? resolvedItemTitle(item.fileTitle, stream.linkedTitle)
+      ? resolvedTopicTitle(item.fileTitle, stream.linkedTitle)
       : item.fileTitle;
 
     const secondaryAsExtraNote =
@@ -1527,25 +1525,25 @@ async function storeDiscoveredItem(
       previous?.sourceUrl ||
       item.url;
 
-    const entry: DiscoveredItemStream = Object.freeze({
+    const entry: DiscoveredTopicStream = Object.freeze({
       ...merged,
       title,
       sourceUrl,
       folderPath: item.folderPath,
-      itemIndex,
+      topicIndex,
     });
 
     return Object.freeze({
       ...scan,
       discovered: [
         ...scan.discovered.filter(
-          (discovered) => discovered.itemIndex !== itemIndex,
+          (discovered) => discovered.topicIndex !== topicIndex,
         ),
         entry,
       ],
-      nextItemIndex: countChecked
-        ? Math.min(scan.items.length, scan.nextItemIndex + 1)
-        : scan.nextItemIndex,
+      nextTopicIndex: countChecked
+        ? Math.min(scan.items.length, scan.nextTopicIndex + 1)
+        : scan.nextTopicIndex,
     });
   });
 }
@@ -1613,9 +1611,9 @@ async function storeProbedStream(
     Boolean(probe.followedLinkedVideo),
   );
 
-  await storeDiscoveredItem(
+  await storeDiscoveredTopic(
     probe.scanId,
-    probe.itemIndex,
+    probe.topicIndex,
     { ...stream, subtitles: mergedSubtitles, linkedTitle },
     false,
   );
@@ -1630,13 +1628,11 @@ async function storeProbedStream(
     }),
   });
 
-  const isApiPlaylist = isApiPlaylistPage(
-    probe.playlistUrl || stream.sourceUrl,
-  );
+  const isApiTrack = isApiTrackPage(probe.playlistUrl || stream.sourceUrl);
 
   scheduleWorkerEarlyAdvance(
     tabId,
-    mergedSubtitles.length || isApiPlaylist ? 400 : 1400,
+    mergedSubtitles.length || isApiTrack ? 400 : 1400,
   );
 }
 
@@ -1649,9 +1645,9 @@ async function storeProbeSubtitles(
   if (!probe || probe.navigated === false || !subtitles.length) return;
   const result = { attached: false };
 
-  await updatePlaylistScan(probe.scanId, (scan) => {
+  await updateTrackScan(probe.scanId, (scan) => {
     const exists = scan.discovered.some(
-      (item) => item.itemIndex === probe.itemIndex,
+      (item) => item.topicIndex === probe.topicIndex,
     );
 
     if (!exists) return null;
@@ -1660,7 +1656,7 @@ async function storeProbeSubtitles(
     return Object.freeze({
       ...scan,
       discovered: scan.discovered.map((item) =>
-        item.itemIndex === probe.itemIndex
+        item.topicIndex === probe.topicIndex
           ? Object.freeze({
               ...item,
               subtitles: uniqueSubtitles([...item.subtitles, ...subtitles]),
@@ -1722,9 +1718,9 @@ function resolveHiddenFrameProbe(
   return null;
 }
 
-async function recordPlaylistStream(
+async function recordTrackStream(
   tabId: number,
-  stream: PlaylistStreamSignal,
+  stream: TrackStreamSignal,
   frameId = 0,
 ): Promise<void> {
   const frameProbe = hiddenFrameProbes.get(hiddenFrameKey(tabId, frameId));
@@ -1739,7 +1735,7 @@ async function recordPlaylistStream(
       frameProbe.sourceUrl,
       [],
       frameProbe.ruleId,
-      frameProbe.itemTitle,
+      frameProbe.topicTitle,
       tabId,
     );
 
@@ -1775,7 +1771,7 @@ async function ensureMainWorldProbeInjected(tabId: number): Promise<boolean> {
   return chrome.scripting
     .executeScript({
       target: { tabId },
-      files: ["dist/page-playlist-probe.js"],
+      files: ["dist/page-track-probe.js"],
       world: "MAIN",
     })
     .then(() => true)
@@ -1784,16 +1780,16 @@ async function ensureMainWorldProbeInjected(tabId: number): Promise<boolean> {
 
 /**
  * Runs a headless parallel probe inside a signed-in playlist tab (or hidden
- * same-origin iframe) via page-playlist-probe.js (0 new tabs opened).
+ * same-origin iframe) via page-track-probe.js (0 new tabs opened).
  */
-async function probePlaylistItemsInTab(
+async function probeTrackTopicsInTab(
   scanId: string,
   tabId: number,
-  itemIndices: readonly number[],
+  topicIndices: readonly number[],
   frameId = 0,
   allowInjectRetry = true,
-): Promise<PlaylistProbeResult> {
-  if (!itemIndices.length) {
+): Promise<TrackProbeResult> {
+  if (!topicIndices.length) {
     return {
       ok: true,
       rateLimited: false,
@@ -1803,7 +1799,7 @@ async function probePlaylistItemsInTab(
     };
   }
 
-  const scan = await getPlaylistScan(scanId);
+  const scan = await getTrackScan(scanId);
 
   if (!scan || scan.status !== "scanning") {
     return {
@@ -1821,7 +1817,7 @@ async function probePlaylistItemsInTab(
     return {
       ok: false,
       rateLimited: false,
-      unresolvedIndices: [...itemIndices],
+      unresolvedIndices: [...topicIndices],
       unresolvedLinks: {},
       unresolvedLinkLists: {},
     };
@@ -1830,15 +1826,15 @@ async function probePlaylistItemsInTab(
   const tabUrl = tab.url;
   const requestId = crypto.randomUUID();
 
-  const payload = itemIndices.map((itemIndex) => ({
-    itemIndex,
-    id: scan.items[itemIndex].id,
-    title: scan.items[itemIndex].fileTitle,
-    sectionTitle: scan.items[itemIndex].folderPath.at(-1) || "",
-    url: scan.items[itemIndex].url,
+  const payload = topicIndices.map((topicIndex) => ({
+    topicIndex,
+    id: scan.items[topicIndex].id,
+    title: scan.items[topicIndex].fileTitle,
+    sectionTitle: scan.items[topicIndex].folderPath.at(-1) || "",
+    url: scan.items[topicIndex].url,
   }));
 
-  const attemptResult = await new Promise<PlaylistProbeAttemptResult>(
+  const attemptResult = await new Promise<TrackProbeAttemptResult>(
     (resolve) => {
       const inspectionQueue: ProbeJob[] = [];
 
@@ -1889,19 +1885,19 @@ async function probePlaylistItemsInTab(
         job: ProbeJob,
         slotRuleId: number,
       ): Promise<void> => {
-        const itemTitleText = scan.items[job.itemIndex]?.fileTitle || "";
+        const topicTitleText = scan.items[job.topicIndex]?.fileTitle || "";
 
         const built = await buildProbedStream(
           job.rawUrl,
           job.sourceUrl || tabUrl,
           job.subtitles,
           slotRuleId,
-          `${itemTitleText} ${scan.title || ""}`,
+          `${topicTitleText} ${scan.title || ""}`,
           tabId,
         );
 
         if (!built && !job.documents) {
-          if (!job.partial) await incrementCheckedItemCount(scanId);
+          if (!job.partial) await incrementCheckedTopicCount(scanId);
 
           return;
         }
@@ -1913,15 +1909,15 @@ async function probePlaylistItemsInTab(
               ...(job.documents ? { documents: job.documents } : {}),
             }
           : documentsOnlyStream(
-              job.itemIndex,
+              job.topicIndex,
               job.sourceUrl || tabUrl,
-              job.documents as ItemCompanionDocuments,
+              job.documents as TopicCompanionDocuments,
               job.linkedTitle,
             );
 
-        await storeDiscoveredItem(
+        await storeDiscoveredTopic(
           scanId,
-          job.itemIndex,
+          job.topicIndex,
           entryStream,
           !job.partial,
         );
@@ -1944,7 +1940,7 @@ async function probePlaylistItemsInTab(
 
           inspectOneJob(job, slotRuleId)
             .catch(() =>
-              job.partial ? null : incrementCheckedItemCount(scanId),
+              job.partial ? null : incrementCheckedTopicCount(scanId),
             )
             .finally(() => {
               chrome.declarativeNetRequest
@@ -1972,7 +1968,7 @@ async function probePlaylistItemsInTab(
               ok: false,
               needsInject: false,
               rateLimited: false,
-              unresolvedIndices: [...itemIndices],
+              unresolvedIndices: [...topicIndices],
               unresolvedLinks: {},
               unresolvedLinkLists: {},
             }),
@@ -1985,7 +1981,7 @@ async function probePlaylistItemsInTab(
         tabId,
         frameId,
         timeout: null,
-        onItem(itemIndex, stream, partial = false) {
+        onTopic(topicIndex, stream, partial = false) {
           resetTimeout();
 
           const rawUrl =
@@ -1999,18 +1995,20 @@ async function probePlaylistItemsInTab(
 
             probeState.activeWorkers += 1;
 
-            storeDiscoveredItem(
+            storeDiscoveredTopic(
               scanId,
-              itemIndex,
+              topicIndex,
               documentsOnlyStream(
-                itemIndex,
+                topicIndex,
                 safeMediaUrl(stream?.sourceUrl) || tabUrl,
                 documents,
                 linkedTitle,
               ),
               !partial,
             )
-              .catch(() => (partial ? null : incrementCheckedItemCount(scanId)))
+              .catch(() =>
+                partial ? null : incrementCheckedTopicCount(scanId),
+              )
               .finally(() => {
                 probeState.activeWorkers -= 1;
                 finishIfReady();
@@ -2020,13 +2018,13 @@ async function probePlaylistItemsInTab(
           }
 
           if (!rawUrl) {
-            if (!partial) incrementCheckedItemCount(scanId).catch(() => {});
+            if (!partial) incrementCheckedTopicCount(scanId).catch(() => {});
 
             return;
           }
 
           inspectionQueue.push({
-            itemIndex,
+            topicIndex,
             rawUrl,
             subtitles: Array.isArray(stream?.subtitles) ? stream.subtitles : [],
             linkedTitle:
@@ -2090,7 +2088,7 @@ async function probePlaylistItemsInTab(
         .sendMessage(
           tabId,
           {
-            type: "probe-playlist-items",
+            type: "probe-track-topics",
             requestId,
             items: payload,
           },
@@ -2111,7 +2109,7 @@ async function probePlaylistItemsInTab(
               ok: false,
               needsInject: ack?.reason === "probe-not-ready",
               rateLimited: false,
-              unresolvedIndices: [...itemIndices],
+              unresolvedIndices: [...topicIndices],
               unresolvedLinks: {},
               unresolvedLinkLists: {},
             }),
@@ -2129,7 +2127,7 @@ async function probePlaylistItemsInTab(
     const injected = await ensureMainWorldProbeInjected(tabId);
 
     if (injected) {
-      return probePlaylistItemsInTab(scanId, tabId, itemIndices, 0, false);
+      return probeTrackTopicsInTab(scanId, tabId, topicIndices, 0, false);
     }
   }
 
@@ -2155,9 +2153,9 @@ function markdownHasSupplementaryLinkedPost(
   return false;
 }
 
-async function seedCurrentItemFromTab(
+async function seedCurrentTopicFromTab(
   scanId: string,
-  scan: PlaylistScan,
+  scan: TrackScan,
   sourceTabId: number | null,
 ): Promise<Set<number>> {
   if (!validTabId(sourceTabId)) return new Set();
@@ -2213,9 +2211,9 @@ async function seedCurrentItemFromTab(
 
   const fullyResolved =
     !hasLinkedPosts &&
-    (mergedSubtitles.length > 0 || isApiPlaylistPage(sourceState.pageUrl));
+    (mergedSubtitles.length > 0 || isApiTrackPage(sourceState.pageUrl));
 
-  await storeDiscoveredItem(
+  await storeDiscoveredTopic(
     scanId,
     currentIdx,
     {
@@ -2239,14 +2237,14 @@ function originOfUrl(rawUrl: string): string {
   }
 }
 
-function itemTargetUrl(
-  scan: PlaylistScan,
+function topicTargetUrl(
+  scan: TrackScan,
   unresolvedLinks: Readonly<Record<string, string>>,
-  itemIndex: number,
+  topicIndex: number,
 ): string {
   return (
-    safeMediaUrl(unresolvedLinks[String(itemIndex)]) ||
-    scan.items[itemIndex]?.url ||
+    safeMediaUrl(unresolvedLinks[String(topicIndex)]) ||
+    scan.items[topicIndex]?.url ||
     ""
   );
 }
@@ -2255,14 +2253,14 @@ function itemTargetUrl(
  * Splits pending item indices into same-origin (eligible for invisible
  * offscreen iframe scanning) and cross-origin buckets.
  */
-function partitionSameOriginItems(
-  scan: PlaylistScan,
+function partitionSameOriginTopics(
+  scan: TrackScan,
   indices: readonly number[],
   unresolvedLinks: Readonly<Record<string, string>>,
   sourceOrigin: string,
 ): { readonly sameOrigin: number[]; readonly crossOrigin: number[] } {
-  const isSameOrigin = (itemIndex: number): boolean =>
-    originOfUrl(itemTargetUrl(scan, unresolvedLinks, itemIndex)) ===
+  const isSameOrigin = (topicIndex: number): boolean =>
+    originOfUrl(topicTargetUrl(scan, unresolvedLinks, topicIndex)) ===
     sourceOrigin;
 
   return Object.freeze({
@@ -2349,7 +2347,7 @@ async function collectFrameDomSubtitles(
   sourceTabId: number,
   frameId: number,
   targetUrl: string,
-  itemTitle: string,
+  topicTitle: string,
 ): Promise<SubtitleTrack[]> {
   const domTracks = externalRecord(
     await chrome.tabs
@@ -2361,7 +2359,7 @@ async function collectFrameDomSubtitles(
 
   const resolved = await Promise.all(
     (domTracks.tracks as SubtitleCandidate[]).map((track) =>
-      resolveExtraSubtitle(track, targetUrl, itemTitle, sourceTabId),
+      resolveExtraSubtitle(track, targetUrl, topicTitle, sourceTabId),
     ),
   );
 
@@ -2419,7 +2417,7 @@ async function collectDomDirectVideoInFrame(
 
 async function finalizeMissingStreamHiddenFrame(
   context: FinalizeHiddenFrameContext,
-): Promise<HiddenFrameItemOutcome> {
+): Promise<HiddenFrameTopicOutcome> {
   const directVideoUrl = await collectDomDirectVideoInFrame(
     context.sourceTabId,
     context.frameId,
@@ -2440,7 +2438,7 @@ async function finalizeMissingStreamHiddenFrame(
       (!context.previousStreamKey ||
         builtDirect.key !== context.previousStreamKey)
     ) {
-      return finalizeHiddenFrameItem({
+      return finalizeHiddenFrameTopic({
         ...context,
         capturedStream: builtDirect,
       });
@@ -2459,11 +2457,11 @@ async function finalizeMissingStreamHiddenFrame(
   );
 
   if (domDocuments) {
-    await storeDiscoveredItem(
+    await storeDiscoveredTopic(
       context.scanId,
-      context.itemIndex,
+      context.topicIndex,
       documentsOnlyStream(
-        context.itemIndex,
+        context.topicIndex,
         context.targetUrl,
         domDocuments,
         linkedTitle,
@@ -2492,7 +2490,7 @@ async function finalizeMissingStreamHiddenFrame(
   }
 
   if (!context.deferCountChecked) {
-    await incrementCheckedItemCount(context.scanId);
+    await incrementCheckedTopicCount(context.scanId);
   }
 
   return Object.freeze({
@@ -2505,9 +2503,9 @@ async function finalizeMissingStreamHiddenFrame(
  * Persists a hidden-frame observation result (or increments checked count on
  * non-video items) and releases its per-worker DNR authorization rule.
  */
-async function finalizeHiddenFrameItem(
+async function finalizeHiddenFrameTopic(
   context: FinalizeHiddenFrameContext,
-): Promise<HiddenFrameItemOutcome> {
+): Promise<HiddenFrameTopicOutcome> {
   chrome.declarativeNetRequest
     .updateSessionRules({ removeRuleIds: [context.slotRuleId] })
     .catch(() => {});
@@ -2541,9 +2539,9 @@ async function finalizeHiddenFrameItem(
     ...fallbackDomTracks,
   ]);
 
-  await storeDiscoveredItem(
+  await storeDiscoveredTopic(
     context.scanId,
-    context.itemIndex,
+    context.topicIndex,
     {
       ...context.capturedStream,
       subtitles: mergedSubtitles,
@@ -2564,7 +2562,7 @@ async function finalizeHiddenFrameItem(
 }
 
 interface HiddenFrameObserver {
-  readonly promise: Promise<HiddenFrameItemOutcome>;
+  readonly promise: Promise<HiddenFrameTopicOutcome>;
   readonly abort: () => void;
 }
 
@@ -2581,13 +2579,13 @@ function buildHiddenFrameObserverEntry(
   slotRuleId: number,
   schedule: (delayMs: number) => void,
 ): HiddenFrameProbe {
-  const isApi = isApiPlaylistPage(options.targetUrl);
+  const isApi = isApiTrackPage(options.targetUrl);
 
   return {
     scanId: options.scanId,
-    itemIndex: options.itemIndex,
+    topicIndex: options.topicIndex,
     sourceUrl: options.targetUrl,
-    itemTitle: options.item.fileTitle,
+    topicTitle: options.item.fileTitle,
     ruleId: slotRuleId,
     onStream(stream) {
       if (state.done) return;
@@ -2647,7 +2645,7 @@ function createHiddenFrameObserver(
 
   const holder: { abort: () => void } = { abort: () => {} };
 
-  const promise = new Promise<HiddenFrameItemOutcome>((resolve) => {
+  const promise = new Promise<HiddenFrameTopicOutcome>((resolve) => {
     holder.abort = () => {
       if (!stopObserver()) return;
 
@@ -2666,7 +2664,7 @@ function createHiddenFrameObserver(
     const finish = async (): Promise<void> => {
       if (!stopObserver()) return;
 
-      const outcome = await finalizeHiddenFrameItem({
+      const outcome = await finalizeHiddenFrameTopic({
         ...options,
         slotRuleId,
         capturedStream: state.capturedStream,
@@ -2703,7 +2701,7 @@ async function openAndObserveHiddenIframe(
   options: OpenHiddenIframeOptions,
 ): Promise<{
   readonly frame: HiddenFrameHandle;
-  readonly outcome: HiddenFrameItemOutcome;
+  readonly outcome: HiddenFrameTopicOutcome;
 } | null> {
   const holder: { observer: HiddenFrameObserver | null } = {
     observer: null,
@@ -2717,7 +2715,7 @@ async function openAndObserveHiddenIframe(
         scanId: options.scanId,
         sourceTabId: options.sourceTabId,
         frameId,
-        itemIndex: options.itemIndex,
+        topicIndex: options.topicIndex,
         item: options.item,
         targetUrl: options.targetUrl,
         isLinkedVideo: options.isLinkedVideo,
@@ -2745,10 +2743,10 @@ async function openAndObserveHiddenIframe(
         .sendMessage(
           options.sourceTabId,
           {
-            type: "navigate-playlist-sidebar",
-            itemIndex: navIndex,
-            itemTitle: options.item.fileTitle,
-            itemSection: options.item.folderPath.at(-1) || "",
+            type: "navigate-track-sidebar",
+            topicIndex: navIndex,
+            topicTitle: options.item.fileTitle,
+            topicSection: options.item.folderPath.at(-1) || "",
           },
           { frameId: frame.frameId },
         )
@@ -2759,7 +2757,7 @@ async function openAndObserveHiddenIframe(
       holder.observer.abort();
 
       if (!options.deferCountChecked) {
-        await incrementCheckedItemCount(options.scanId);
+        await incrementCheckedTopicCount(options.scanId);
       }
     }
   }
@@ -2786,10 +2784,10 @@ function normalizedRoutePathKey(rawUrl: string): string {
 
 function collectUniqueNonParentUrls(
   rawUrls: readonly unknown[],
-  parentItemUrl: string,
+  parentTopicUrl: string,
   requiredOrigin = "",
 ): string[] {
-  const parentKey = normalizedRoutePathKey(parentItemUrl);
+  const parentKey = normalizedRoutePathKey(parentTopicUrl);
   const seen = new Set<string>();
   const resolved: string[] = [];
 
@@ -2809,34 +2807,34 @@ function collectUniqueNonParentUrls(
   return resolved;
 }
 
-function resolveItemLinkedUrls(
+function resolveTopicLinkedUrls(
   unresolvedLinks: Readonly<Record<string, string>>,
   unresolvedLinkLists: Readonly<Record<string, readonly string[]>>,
-  itemIndex: number,
-  parentItemUrl = "",
+  topicIndex: number,
+  parentTopicUrl = "",
 ): readonly string[] {
-  const fromList = unresolvedLinkLists[String(itemIndex)];
+  const fromList = unresolvedLinkLists[String(topicIndex)];
 
   const rawList: readonly unknown[] =
     Array.isArray(fromList) && fromList.length > 0
       ? fromList
-      : [unresolvedLinks[String(itemIndex)]];
+      : [unresolvedLinks[String(topicIndex)]];
 
-  return collectUniqueNonParentUrls(rawList, parentItemUrl);
+  return collectUniqueNonParentUrls(rawList, parentTopicUrl);
 }
 
 async function probeLinkedUrlInTempIframe(options: {
   readonly scanId: string;
   readonly sourceTabId: number;
   readonly sourceOrigin: string;
-  readonly itemIndex: number;
-  readonly item: PlaylistItem;
+  readonly topicIndex: number;
+  readonly item: TrackTopic;
   readonly linkedUrl: string;
   readonly previousStreamKey: string;
   readonly deferCountChecked?: boolean;
   readonly appendDistinctVideo?: boolean;
   readonly linkedPostMode?: boolean;
-}): Promise<HiddenFrameItemOutcome> {
+}): Promise<HiddenFrameTopicOutcome> {
   if (originOfUrl(options.linkedUrl) !== options.sourceOrigin) {
     return Object.freeze({
       captured: false,
@@ -2848,7 +2846,7 @@ async function probeLinkedUrlInTempIframe(options: {
   const run = await openAndObserveHiddenIframe({
     scanId: options.scanId,
     sourceTabId: options.sourceTabId,
-    itemIndex: options.itemIndex,
+    topicIndex: options.topicIndex,
     item: options.item,
     targetUrl: options.linkedUrl,
     isLinkedVideo: true,
@@ -2875,8 +2873,8 @@ async function probeLinkedUrlsInHiddenFrames(options: {
   readonly scanId: string;
   readonly sourceTabId: number;
   readonly sourceOrigin: string;
-  readonly itemIndex: number;
-  readonly item: PlaylistItem;
+  readonly topicIndex: number;
+  readonly item: TrackTopic;
   readonly linkedUrls: readonly string[];
   readonly previousStreamKey: string;
   readonly deferFinalCount?: boolean;
@@ -2896,7 +2894,7 @@ async function probeLinkedUrlsInHiddenFrames(options: {
     ) || "";
 
   if (!sameOriginUrls.length && !crossOriginUrl && !options.deferFinalCount) {
-    await incrementCheckedItemCount(options.scanId);
+    await incrementCheckedTopicCount(options.scanId);
   }
 
   const cursor = { lastStreamKey: options.previousStreamKey };
@@ -2910,7 +2908,7 @@ async function probeLinkedUrlsInHiddenFrames(options: {
       scanId: options.scanId,
       sourceTabId: options.sourceTabId,
       sourceOrigin: options.sourceOrigin,
-      itemIndex: options.itemIndex,
+      topicIndex: options.topicIndex,
       item: options.item,
       linkedUrl: url,
       previousStreamKey: "",
@@ -2935,15 +2933,15 @@ async function probeLinkedUrlsInHiddenFrames(options: {
  * event is missed. Linked videos always open in a temporary sibling iframe so
  * the primary iframe keeps the playlist sidebar intact.
  */
-async function stepSidebarItemInHiddenFrame(
-  step: StepSidebarItemInput,
-): Promise<HiddenFrameItemOutcome> {
+async function stepSidebarTopicInHiddenFrame(
+  step: StepSidebarTopicInput,
+): Promise<HiddenFrameTopicOutcome> {
   if (step.linkedUrls.length > 0) {
     const multi = await probeLinkedUrlsInHiddenFrames({
       scanId: step.scanId,
       sourceTabId: step.sourceTabId,
       sourceOrigin: step.sourceOrigin,
-      itemIndex: step.itemIndex,
+      topicIndex: step.topicIndex,
       item: step.item,
       linkedUrls: step.linkedUrls,
       previousStreamKey: step.previousStreamKey,
@@ -2960,7 +2958,7 @@ async function stepSidebarItemInHiddenFrame(
     scanId: step.scanId,
     sourceTabId: step.sourceTabId,
     frameId: step.primaryFrame.frameId,
-    itemIndex: step.itemIndex,
+    topicIndex: step.topicIndex,
     item: step.item,
     targetUrl: step.item.url,
     isLinkedVideo: false,
@@ -2972,10 +2970,10 @@ async function stepSidebarItemInHiddenFrame(
       .sendMessage(
         step.sourceTabId,
         {
-          type: "navigate-playlist-sidebar",
-          itemIndex: step.item.navigationIndex,
-          itemTitle: step.item.fileTitle,
-          itemSection: step.item.folderPath.at(-1) || "",
+          type: "navigate-track-sidebar",
+          topicIndex: step.item.navigationIndex,
+          topicTitle: step.item.fileTitle,
+          topicSection: step.item.folderPath.at(-1) || "",
         },
         { frameId: step.primaryFrame.frameId },
       )
@@ -2984,7 +2982,7 @@ async function stepSidebarItemInHiddenFrame(
 
   if (navResult?.ok !== true) {
     observer.abort();
-    await incrementCheckedItemCount(step.scanId);
+    await incrementCheckedTopicCount(step.scanId);
 
     return observer.promise;
   }
@@ -2996,7 +2994,7 @@ async function stepSidebarItemInHiddenFrame(
       scanId: step.scanId,
       sourceTabId: step.sourceTabId,
       sourceOrigin: step.sourceOrigin,
-      itemIndex: step.itemIndex,
+      topicIndex: step.topicIndex,
       item: step.item,
       linkedUrl: outcome.linkedUrl,
       previousStreamKey: step.previousStreamKey,
@@ -3008,8 +3006,8 @@ async function stepSidebarItemInHiddenFrame(
   return outcome;
 }
 
-async function stepSidebarItemsInHiddenFrame(
-  context: StepSidebarItemsContext,
+async function stepSidebarTopicsInHiddenFrame(
+  context: StepSidebarTopicsContext,
 ): Promise<{
   readonly crossOrigin: number[];
   readonly discoveredLinks: Record<string, string>;
@@ -3018,32 +3016,32 @@ async function stepSidebarItemsInHiddenFrame(
   const crossOrigin: number[] = [];
   const discoveredLinks: Record<string, string> = {};
 
-  for (const [stepIndex, itemIndex] of context.itemIndices.entries()) {
+  for (const [stepIndex, topicIndex] of context.topicIndices.entries()) {
     if (stepIndex > 0) await pauseMs(550);
 
-    const item = context.scan.items[itemIndex];
+    const item = context.scan.items[topicIndex];
 
-    const linkedUrls = resolveItemLinkedUrls(
+    const linkedUrls = resolveTopicLinkedUrls(
       context.unresolvedLinks,
       context.unresolvedLinkLists,
-      itemIndex,
+      topicIndex,
       item.url,
     );
 
-    const outcome = await stepSidebarItemInHiddenFrame({
+    const outcome = await stepSidebarTopicInHiddenFrame({
       scanId: context.scanId,
       sourceTabId: context.sourceTabId,
       sourceOrigin: context.sourceOrigin,
       primaryFrame: context.primaryFrame,
-      itemIndex,
+      topicIndex,
       item,
       linkedUrls,
       previousStreamKey: cursor.previousKey,
     });
 
     if (!outcome.captured && outcome.linkedUrl) {
-      crossOrigin.push(itemIndex);
-      discoveredLinks[String(itemIndex)] = outcome.linkedUrl;
+      crossOrigin.push(topicIndex);
+      discoveredLinks[String(topicIndex)] = outcome.linkedUrl;
     }
 
     cursor.previousKey = outcome.streamKey;
@@ -3055,24 +3053,24 @@ async function stepSidebarItemsInHiddenFrame(
 async function runParallelHiddenIframeQueue(
   context: ParallelHiddenIframeContext,
 ): Promise<void> {
-  const queue = [...context.itemIndices];
-  const isPlaylist = isPlaylistPage(context.scan.items[0]?.url || "");
-  const concurrency = isPlaylist ? 1 : HIDDEN_IFRAME_CONCURRENCY;
+  const queue = [...context.topicIndices];
+  const isTrack = isTrackPage(context.scan.items[0]?.url || "");
+  const concurrency = isTrack ? 1 : HIDDEN_IFRAME_CONCURRENCY;
   const workerCount = Math.min(concurrency, Math.max(queue.length, 1));
-  const firstItemOrigin = originOfUrl(context.scan.items[0]?.url || "");
+  const firstTopicOrigin = originOfUrl(context.scan.items[0]?.url || "");
 
   await Promise.all(
     Array.from({ length: workerCount }, async () => {
       while (queue.length > 0) {
-        const itemIndex = queue.shift();
+        const topicIndex = queue.shift();
 
-        if (itemIndex === undefined) break;
-        const item = context.scan.items[itemIndex];
+        if (topicIndex === undefined) break;
+        const item = context.scan.items[topicIndex];
 
-        const linkedUrls = resolveItemLinkedUrls(
+        const linkedUrls = resolveTopicLinkedUrls(
           context.unresolvedLinks,
           context.unresolvedLinkLists,
-          itemIndex,
+          topicIndex,
           item.url,
         );
 
@@ -3080,21 +3078,21 @@ async function runParallelHiddenIframeQueue(
           await probeLinkedUrlsInHiddenFrames({
             scanId: context.scanId,
             sourceTabId: context.sourceTabId,
-            sourceOrigin: firstItemOrigin || originOfUrl(item.url),
-            itemIndex,
+            sourceOrigin: firstTopicOrigin || originOfUrl(item.url),
+            topicIndex,
             item,
             linkedUrls,
             previousStreamKey: "",
           });
 
-          if (isPlaylist && queue.length > 0) await pauseMs(600);
+          if (isTrack && queue.length > 0) await pauseMs(600);
           continue;
         }
 
         const result = await openAndObserveHiddenIframe({
           scanId: context.scanId,
           sourceTabId: context.sourceTabId,
-          itemIndex,
+          topicIndex,
           item,
           targetUrl: item.url,
           isLinkedVideo: false,
@@ -3107,7 +3105,7 @@ async function runParallelHiddenIframeQueue(
           );
         }
 
-        if (isPlaylist && queue.length > 0) await pauseMs(600);
+        if (isTrack && queue.length > 0) await pauseMs(600);
       }
     }),
   );
@@ -3117,9 +3115,9 @@ async function resolveFirstHiddenFrameLinkedVideo(options: {
   readonly scanId: string;
   readonly sourceTabId: number;
   readonly sourceOrigin: string;
-  readonly itemIndex: number;
-  readonly item: PlaylistItem;
-  readonly outcome: HiddenFrameItemOutcome;
+  readonly topicIndex: number;
+  readonly item: TrackTopic;
+  readonly outcome: HiddenFrameTopicOutcome;
   readonly remainingLinkedUrls: readonly string[];
   readonly previousStreamKey: string;
 }): Promise<{
@@ -3131,7 +3129,7 @@ async function resolveFirstHiddenFrameLinkedVideo(options: {
       scanId: options.scanId,
       sourceTabId: options.sourceTabId,
       sourceOrigin: options.sourceOrigin,
-      itemIndex: options.itemIndex,
+      topicIndex: options.topicIndex,
       item: options.item,
       linkedUrls: options.remainingLinkedUrls,
       previousStreamKey: options.previousStreamKey,
@@ -3139,8 +3137,8 @@ async function resolveFirstHiddenFrameLinkedVideo(options: {
 
     if (multi.crossOriginUrl) {
       return Object.freeze({
-        crossOrigin: [options.itemIndex],
-        links: { [String(options.itemIndex)]: multi.crossOriginUrl },
+        crossOrigin: [options.topicIndex],
+        links: { [String(options.topicIndex)]: multi.crossOriginUrl },
       });
     }
 
@@ -3155,7 +3153,7 @@ async function resolveFirstHiddenFrameLinkedVideo(options: {
     scanId: options.scanId,
     sourceTabId: options.sourceTabId,
     sourceOrigin: options.sourceOrigin,
-    itemIndex: options.itemIndex,
+    topicIndex: options.topicIndex,
     item: options.item,
     linkedUrl: options.outcome.linkedUrl,
     previousStreamKey: options.previousStreamKey,
@@ -3165,21 +3163,21 @@ async function resolveFirstHiddenFrameLinkedVideo(options: {
 
   if (!linkedOutcome.captured && linkedOutcome.linkedUrl) {
     return Object.freeze({
-      crossOrigin: [options.itemIndex],
-      links: { [String(options.itemIndex)]: linkedOutcome.linkedUrl },
+      crossOrigin: [options.topicIndex],
+      links: { [String(options.topicIndex)]: linkedOutcome.linkedUrl },
     });
   }
 
   return Object.freeze({ crossOrigin: [], links: {} });
 }
 
-async function escalateHiddenPlaylistProbe(
+async function escalateHiddenTrackProbe(
   scanId: string,
   sourceTabId: number,
   frameId: number,
   afterFirst: readonly number[],
   firstWasLinkedPost: boolean,
-): Promise<PlaylistProbeResult> {
+): Promise<TrackProbeResult> {
   if (!afterFirst.length || firstWasLinkedPost) {
     return Object.freeze({
       ok: !firstWasLinkedPost,
@@ -3190,13 +3188,7 @@ async function escalateHiddenPlaylistProbe(
     });
   }
 
-  return probePlaylistItemsInTab(
-    scanId,
-    sourceTabId,
-    afterFirst,
-    frameId,
-    false,
-  );
+  return probeTrackTopicsInTab(scanId, sourceTabId, afterFirst, frameId, false);
 }
 
 async function releaseReusableFirstFrame(
@@ -3213,7 +3205,7 @@ function mergeEscalatedProbeLinks(
   unresolvedLinks: Readonly<Record<string, string>>,
   unresolvedLinkLists: Readonly<Record<string, readonly string[]>>,
   firstLinkedLinks: Readonly<Record<string, string>>,
-  escalated: PlaylistProbeResult,
+  escalated: TrackProbeResult,
 ): {
   readonly mergedLinks: Record<string, string>;
   readonly mergedLinkLists: Record<string, readonly string[]>;
@@ -3232,18 +3224,18 @@ function mergeEscalatedProbeLinks(
   };
 }
 
-async function stepSidebarAndLinkedItems(options: {
+async function stepSidebarAndLinkedTopics(options: {
   readonly scanId: string;
   readonly sourceTabId: number;
   readonly sourceOrigin: string;
-  readonly playlistPageUrl: string;
-  readonly scan: PlaylistScan;
-  readonly itemIndices: readonly number[];
+  readonly trackPageUrl: string;
+  readonly scan: TrackScan;
+  readonly topicIndices: readonly number[];
   readonly unresolvedLinks: Readonly<Record<string, string>>;
   readonly unresolvedLinkLists: Readonly<Record<string, readonly string[]>>;
-  readonly reusablePlaylistFrame: HiddenFrameHandle | null;
+  readonly reusableTrackFrame: HiddenFrameHandle | null;
   readonly initialStreamKey: string;
-  readonly seededPlaylistKey: string;
+  readonly seededTrackKey: string;
 }): Promise<{
   readonly crossOrigin: number[];
   readonly discoveredLinks: Record<string, string>;
@@ -3253,18 +3245,18 @@ async function stepSidebarAndLinkedItems(options: {
   const sidebarIndices: number[] = [];
   const linkedCursor = { count: 0 };
 
-  for (const itemIndex of options.itemIndices) {
-    const item = options.scan.items[itemIndex];
+  for (const topicIndex of options.topicIndices) {
+    const item = options.scan.items[topicIndex];
 
-    const linkedUrls = resolveItemLinkedUrls(
+    const linkedUrls = resolveTopicLinkedUrls(
       options.unresolvedLinks,
       options.unresolvedLinkLists,
-      itemIndex,
+      topicIndex,
       item.url,
     );
 
     if (!linkedUrls.length) {
-      sidebarIndices.push(itemIndex);
+      sidebarIndices.push(topicIndex);
       continue;
     }
 
@@ -3275,58 +3267,58 @@ async function stepSidebarAndLinkedItems(options: {
       scanId: options.scanId,
       sourceTabId: options.sourceTabId,
       sourceOrigin: options.sourceOrigin,
-      itemIndex,
+      topicIndex,
       item,
       linkedUrls,
       previousStreamKey: "",
     });
 
     if (multi.crossOriginUrl) {
-      crossOrigin.push(itemIndex);
-      discoveredLinks[String(itemIndex)] = multi.crossOriginUrl;
+      crossOrigin.push(topicIndex);
+      discoveredLinks[String(topicIndex)] = multi.crossOriginUrl;
     }
   }
 
   if (!sidebarIndices.length) {
-    if (options.reusablePlaylistFrame) {
+    if (options.reusableTrackFrame) {
       await closeHiddenProbeFrameInTab(
         options.sourceTabId,
-        options.reusablePlaylistFrame.probeId,
+        options.reusableTrackFrame.probeId,
       );
     }
 
     return Object.freeze({ crossOrigin, discoveredLinks });
   }
 
-  const playlistFrame =
-    options.reusablePlaylistFrame ||
+  const trackFrame =
+    options.reusableTrackFrame ||
     (await openHiddenProbeFrameInTab(
       options.sourceTabId,
-      options.playlistPageUrl,
+      options.trackPageUrl,
     ));
 
-  if (!playlistFrame) {
+  if (!trackFrame) {
     return Object.freeze({
       crossOrigin: [...crossOrigin, ...sidebarIndices],
       discoveredLinks,
     });
   }
 
-  const stepped = await stepSidebarItemsInHiddenFrame({
+  const stepped = await stepSidebarTopicsInHiddenFrame({
     scanId: options.scanId,
     sourceTabId: options.sourceTabId,
     sourceOrigin: options.sourceOrigin,
     scan: options.scan,
-    primaryFrame: playlistFrame,
-    itemIndices: sidebarIndices,
+    primaryFrame: trackFrame,
+    topicIndices: sidebarIndices,
     unresolvedLinks: options.unresolvedLinks,
     unresolvedLinkLists: options.unresolvedLinkLists,
-    initialStreamKey: options.reusablePlaylistFrame
+    initialStreamKey: options.reusableTrackFrame
       ? options.initialStreamKey
-      : options.seededPlaylistKey,
+      : options.seededTrackKey,
   });
 
-  await closeHiddenProbeFrameInTab(options.sourceTabId, playlistFrame.probeId);
+  await closeHiddenProbeFrameInTab(options.sourceTabId, trackFrame.probeId);
 
   return Object.freeze({
     crossOrigin: [...crossOrigin, ...stepped.crossOrigin],
@@ -3343,7 +3335,7 @@ async function stepSidebarAndLinkedItems(options: {
 async function runHiddenIframeScan(
   scanId: string,
   sourceTabId: number,
-  scan: PlaylistScan,
+  scan: TrackScan,
   remaining: number[],
   unresolvedLinks: Record<string, string>,
   unresolvedLinkLists: Record<string, readonly string[]> = {},
@@ -3355,7 +3347,7 @@ async function runHiddenIframeScan(
     return Object.freeze({ remaining, unresolvedLinks });
   }
 
-  const initialPartition = partitionSameOriginItems(
+  const initialPartition = partitionSameOriginTopics(
     scan,
     remaining,
     unresolvedLinks,
@@ -3368,7 +3360,7 @@ async function runHiddenIframeScan(
 
   const firstIndex = initialPartition.sameOrigin[0];
 
-  const firstLinks = resolveItemLinkedUrls(
+  const firstLinks = resolveTopicLinkedUrls(
     unresolvedLinks,
     unresolvedLinkLists,
     firstIndex,
@@ -3377,22 +3369,22 @@ async function runHiddenIframeScan(
 
   const firstLinkedUrl = firstLinks[0] || "";
   const remainingFirstLinks = firstLinks.slice(1);
-  const latestScan = (await getPlaylistScan(scanId)) || scan;
+  const latestScan = (await getTrackScan(scanId)) || scan;
 
   const isSidebarButtons = scan.items.some((item) =>
     Number.isSafeInteger(item.navigationIndex),
   );
 
-  const seededPlaylistKey = isSidebarButtons
+  const seededTrackKey = isSidebarButtons
     ? latestScan.discovered[0]?.key || ""
     : "";
 
-  const initialSeededKey = !firstLinkedUrl ? seededPlaylistKey : "";
+  const initialSeededKey = !firstLinkedUrl ? seededTrackKey : "";
 
   const firstRun = await openAndObserveHiddenIframe({
     scanId,
     sourceTabId,
-    itemIndex: firstIndex,
+    topicIndex: firstIndex,
     item: scan.items[firstIndex],
     targetUrl: firstLinkedUrl || scan.items[firstIndex].url,
     isLinkedVideo: Boolean(firstLinkedUrl),
@@ -3409,7 +3401,7 @@ async function runHiddenIframeScan(
     scanId,
     sourceTabId,
     sourceOrigin,
-    itemIndex: firstIndex,
+    topicIndex: firstIndex,
     item: scan.items[firstIndex],
     outcome: firstRun.outcome,
     remainingLinkedUrls: remainingFirstLinks,
@@ -3424,7 +3416,7 @@ async function runHiddenIframeScan(
 
   const afterFirst = initialPartition.sameOrigin.slice(1);
 
-  const escalated = await escalateHiddenPlaylistProbe(
+  const escalated = await escalateHiddenTrackProbe(
     scanId,
     sourceTabId,
     firstRun.frame.frameId,
@@ -3457,7 +3449,7 @@ async function runHiddenIframeScan(
     ? escalated.unresolvedIndices
     : afterFirst;
 
-  const nextPartition = partitionSameOriginItems(
+  const nextPartition = partitionSameOriginTopics(
     scan,
     stillRemaining,
     mergedLinks,
@@ -3482,18 +3474,18 @@ async function runHiddenIframeScan(
   }
 
   if (isSidebarButtons) {
-    const stepped = await stepSidebarAndLinkedItems({
+    const stepped = await stepSidebarAndLinkedTopics({
       scanId,
       sourceTabId,
       sourceOrigin,
-      playlistPageUrl: sourceTab?.url || scan.items[0].url,
+      trackPageUrl: sourceTab?.url || scan.items[0].url,
       scan,
-      itemIndices: nextPartition.sameOrigin,
+      topicIndices: nextPartition.sameOrigin,
       unresolvedLinks: mergedLinks,
       unresolvedLinkLists: mergedLinkLists,
-      reusablePlaylistFrame: firstWasLinked ? null : firstRun.frame,
+      reusableTrackFrame: firstWasLinked ? null : firstRun.frame,
       initialStreamKey: firstRun.outcome.streamKey,
-      seededPlaylistKey,
+      seededTrackKey,
     });
 
     return Object.freeze({
@@ -3517,7 +3509,7 @@ async function runHiddenIframeScan(
     scanId,
     sourceTabId,
     scan,
-    itemIndices: nextPartition.sameOrigin,
+    topicIndices: nextPartition.sameOrigin,
     unresolvedLinks: mergedLinks,
     unresolvedLinkLists: mergedLinkLists,
   });
@@ -3532,14 +3524,14 @@ async function runHiddenIframeScan(
   });
 }
 
-async function runHeadlessPlaylistScan(
+async function runHeadlessTrackScan(
   scanId: string,
   sourceTabId: number | null,
 ): Promise<void> {
-  const scan = await getPlaylistScan(scanId);
+  const scan = await getTrackScan(scanId);
 
   if (!scan || scan.status !== "scanning") return;
-  const resolved = await seedCurrentItemFromTab(scanId, scan, sourceTabId);
+  const resolved = await seedCurrentTopicFromTab(scanId, scan, sourceTabId);
 
   const initialRemaining = scan.items
     .map((_, index) => index)
@@ -3547,7 +3539,7 @@ async function runHeadlessPlaylistScan(
 
   const tier1Result =
     validTabId(sourceTabId) && initialRemaining.length > 0
-      ? await probePlaylistItemsInTab(scanId, sourceTabId, initialRemaining)
+      ? await probeTrackTopicsInTab(scanId, sourceTabId, initialRemaining)
       : {
           ok: false,
           rateLimited: false,
@@ -3557,7 +3549,7 @@ async function runHeadlessPlaylistScan(
         };
 
   if (tier1Result.rateLimited) {
-    await markPlaylistScanReady(scanId, true);
+    await markTrackScanReady(scanId, true);
 
     return;
   }
@@ -3573,7 +3565,7 @@ async function runHeadlessPlaylistScan(
     : {};
 
   if (!afterTier1.length) {
-    await markPlaylistScanReady(scanId);
+    await markTrackScanReady(scanId);
 
     return;
   }
@@ -3595,13 +3587,13 @@ async function runHeadlessPlaylistScan(
       });
 
   if (afterIframe.rateLimited) {
-    await markPlaylistScanReady(scanId, true);
+    await markTrackScanReady(scanId, true);
 
     return;
   }
 
   if (!afterIframe.remaining.length) {
-    await markPlaylistScanReady(scanId);
+    await markTrackScanReady(scanId);
 
     return;
   }
@@ -3640,7 +3632,7 @@ async function openMinimizedWorkerTab(startUrl: string): Promise<{
 
 /**
  * Opens ONE minimized popup window for items that require live JS execution,
- * re-tries parallel API probing once page-playlist-probe.js loads, and otherwise
+ * re-tries parallel API probing once page-track-probe.js loads, and otherwise
  * steps rapidly in-place with early-exit as soon as each stream arrives.
  */
 async function startMinimizedWorkerScan(
@@ -3648,22 +3640,22 @@ async function startMinimizedWorkerScan(
   unresolvedIndices: readonly number[],
   unresolvedLinks: Record<string, string> = {},
 ): Promise<void> {
-  const scan = await getPlaylistScan(scanId);
+  const scan = await getTrackScan(scanId);
 
   if (!scan || scan.status !== "scanning" || !unresolvedIndices.length) {
-    await markPlaylistScanReady(scanId);
+    await markTrackScanReady(scanId);
 
     return;
   }
 
   const firstIndex = unresolvedIndices[0];
-  const firstItem = scan.items[firstIndex];
+  const firstTopic = scan.items[firstIndex];
   const firstLinkedUrl = safeMediaUrl(unresolvedLinks[String(firstIndex)]);
 
-  const opened = await openMinimizedWorkerTab(firstLinkedUrl || firstItem.url);
+  const opened = await openMinimizedWorkerTab(firstLinkedUrl || firstTopic.url);
 
   if (!opened) {
-    await markPlaylistScanReady(scanId);
+    await markTrackScanReady(scanId);
 
     return;
   }
@@ -3674,7 +3666,7 @@ async function startMinimizedWorkerScan(
     Number.isSafeInteger(item.navigationIndex),
   );
 
-  const rawNavIndex = firstItem.navigationIndex;
+  const rawNavIndex = firstTopic.navigationIndex;
 
   const navigationIndex =
     typeof rawNavIndex === "number" && Number.isSafeInteger(rawNavIndex)
@@ -3687,14 +3679,14 @@ async function startMinimizedWorkerScan(
   const initialProbe: WorkerTabProbe = Object.freeze({
     scanId,
     workerWindowId,
-    playlistUrl: scan.items[0]?.url || firstItem.url,
+    playlistUrl: scan.items[0]?.url || firstTopic.url,
     unresolvedLinks,
     queue: unresolvedIndices,
     queuePos: 0,
-    itemIndex: firstIndex,
+    topicIndex: firstIndex,
     navigationIndex,
-    itemTitle: firstItem.fileTitle,
-    itemSection: firstItem.folderPath.at(-1) || "",
+    topicTitle: firstTopic.fileTitle,
+    topicSection: firstTopic.folderPath.at(-1) || "",
     linkedTitle: "",
     navigated: !needsNavigation,
     navigationStarted: false,
@@ -3719,12 +3711,12 @@ async function startMinimizedWorkerScan(
   activeScanWorkerTabs.set(scanId, tabsSet);
 
   if (needsNavigation) {
-    await chrome.alarms.create(`playlist-navigate:${workerTabId}`, {
+    await chrome.alarms.create(`track-navigate:${workerTabId}`, {
       when: Date.now() + 1200,
     });
   }
 
-  await chrome.alarms.create(`playlist-probe:${workerTabId}`, {
+  await chrome.alarms.create(`track-probe:${workerTabId}`, {
     when: Date.now() + (needsNavigation ? 10000 : 5500),
   });
 }
@@ -3781,7 +3773,7 @@ async function triggerProbeNavigation(tabId: number): Promise<void> {
     !probe ||
     probe.navigated ||
     probe.navigationStarted ||
-    (!Number.isSafeInteger(probe.navigationIndex) && !probe.itemTitle)
+    (!Number.isSafeInteger(probe.navigationIndex) && !probe.topicTitle)
   ) {
     return;
   }
@@ -3793,10 +3785,10 @@ async function triggerProbeNavigation(tabId: number): Promise<void> {
   const result = externalRecord(
     await chrome.tabs
       .sendMessage(tabId, {
-        type: "navigate-playlist-sidebar",
-        itemIndex: probe.navigationIndex,
-        itemTitle: probe.itemTitle || "",
-        itemSection: probe.itemSection || "",
+        type: "navigate-track-sidebar",
+        topicIndex: probe.navigationIndex,
+        topicTitle: probe.topicTitle || "",
+        topicSection: probe.topicSection || "",
       })
       .catch(() => null),
   );
@@ -3819,7 +3811,7 @@ async function triggerProbeNavigation(tabId: number): Promise<void> {
 
   await chrome.storage.session.remove(stateKey(tabId));
 
-  await chrome.alarms.create(`playlist-probe:${tabId}`, {
+  await chrome.alarms.create(`track-probe:${tabId}`, {
     when: Date.now() + 4000,
   });
 }
@@ -3858,7 +3850,7 @@ async function tryFollowLinkedVideoInWorker(
     await chrome.tabs.update(tabId, { url: linkedUrl }).catch(() => {});
   }
 
-  await chrome.alarms.create(`playlist-probe:${tabId}`, {
+  await chrome.alarms.create(`track-probe:${tabId}`, {
     when: Date.now() + 5500,
   });
 
@@ -3873,13 +3865,13 @@ async function tryFollowLinkedVideoInWorker(
 async function fanoutDistinctUrlWorkers(
   tabId: number,
   probe: WorkerTabProbe,
-  scan: PlaylistScan,
+  scan: TrackScan,
   remaining: number[],
   unresolvedLinks: Record<string, string>,
 ): Promise<number[]> {
   if (
     probe.isSidebarButtons ||
-    isPlaylistPage(probe.playlistUrl) ||
+    isTrackPage(probe.playlistUrl) ||
     probe.fanoutStarted ||
     remaining.length <= 1 ||
     probe.workerWindowId === null
@@ -3900,7 +3892,7 @@ async function fanoutDistinctUrlWorkers(
 
   for (const shardQueue of buckets.slice(1)) {
     const shardFirstIndex = shardQueue[0];
-    const shardItem = scan.items[shardFirstIndex];
+    const shardTopic = scan.items[shardFirstIndex];
 
     const shardLinkedUrl = safeMediaUrl(
       unresolvedLinks[String(shardFirstIndex)],
@@ -3909,7 +3901,7 @@ async function fanoutDistinctUrlWorkers(
     const extraTab = await chrome.tabs
       .create({
         windowId: probe.workerWindowId,
-        url: shardLinkedUrl || shardItem.url,
+        url: shardLinkedUrl || shardTopic.url,
         active: false,
       })
       .catch(() => null);
@@ -3928,10 +3920,10 @@ async function fanoutDistinctUrlWorkers(
       unresolvedLinks,
       queue: shardQueue,
       queuePos: 0,
-      itemIndex: shardFirstIndex,
+      topicIndex: shardFirstIndex,
       navigationIndex: null,
-      itemTitle: shardItem.fileTitle,
-      itemSection: shardItem.folderPath.at(-1) || "",
+      topicTitle: shardTopic.fileTitle,
+      topicSection: shardTopic.folderPath.at(-1) || "",
       linkedTitle: "",
       navigated: true,
       navigationStarted: false,
@@ -3950,7 +3942,7 @@ async function fanoutDistinctUrlWorkers(
       [probeKey(extraTab.id)]: shardProbe,
     });
 
-    await chrome.alarms.create(`playlist-probe:${extraTab.id}`, {
+    await chrome.alarms.create(`track-probe:${extraTab.id}`, {
       when: Date.now() + 5000,
     });
   }
@@ -3965,14 +3957,14 @@ async function fanoutDistinctUrlWorkers(
 async function dispatchNextWorkerStep(
   tabId: number,
   probe: WorkerTabProbe,
-  nextItem: PlaylistItem,
+  nextTopic: TrackTopic,
   nextLinkedUrl: string | null,
   returningFromLinkedPage: boolean,
 ): Promise<void> {
   if (nextLinkedUrl) {
     await chrome.tabs.update(tabId, { url: nextLinkedUrl }).catch(() => {});
 
-    await chrome.alarms.create(`playlist-probe:${tabId}`, {
+    await chrome.alarms.create(`track-probe:${tabId}`, {
       when: Date.now() + 5500,
     });
 
@@ -3981,14 +3973,14 @@ async function dispatchNextWorkerStep(
 
   if (returningFromLinkedPage) {
     await chrome.tabs
-      .update(tabId, { url: probe.playlistUrl || nextItem.url })
+      .update(tabId, { url: probe.playlistUrl || nextTopic.url })
       .catch(() => {});
 
-    await chrome.alarms.create(`playlist-navigate:${tabId}`, {
+    await chrome.alarms.create(`track-navigate:${tabId}`, {
       when: Date.now() + 1500,
     });
 
-    await chrome.alarms.create(`playlist-probe:${tabId}`, {
+    await chrome.alarms.create(`track-probe:${tabId}`, {
       when: Date.now() + 10000,
     });
 
@@ -3998,16 +3990,16 @@ async function dispatchNextWorkerStep(
   if (probe.isSidebarButtons) {
     await triggerProbeNavigation(tabId);
 
-    await chrome.alarms.create(`playlist-probe:${tabId}`, {
+    await chrome.alarms.create(`track-probe:${tabId}`, {
       when: Date.now() + 4500,
     });
 
     return;
   }
 
-  await chrome.tabs.update(tabId, { url: nextItem.url }).catch(() => {});
+  await chrome.tabs.update(tabId, { url: nextTopic.url }).catch(() => {});
 
-  await chrome.alarms.create(`playlist-probe:${tabId}`, {
+  await chrome.alarms.create(`track-probe:${tabId}`, {
     when: Date.now() + 8000,
   });
 }
@@ -4015,7 +4007,7 @@ async function dispatchNextWorkerStep(
 async function attachWorkerDomSubtitles(
   tabId: number,
   probe: WorkerTabProbe,
-  scan: PlaylistScan,
+  scan: TrackScan,
 ): Promise<void> {
   if (!probe.streamCaptured || probe.hasSubtitles) return;
 
@@ -4029,13 +4021,13 @@ async function attachWorkerDomSubtitles(
     return;
   }
 
-  const itemText = scan.items[probe.itemIndex]?.fileTitle || "";
+  const topicText = scan.items[probe.topicIndex]?.fileTitle || "";
   const tab = await chrome.tabs.get(tabId).catch(() => null);
 
   const resolvedTracks = (
     await Promise.all(
       (domSubtitles.tracks as SubtitleCandidate[]).map((track) =>
-        resolveExtraSubtitle(track, tab?.url || "", itemText, tabId),
+        resolveExtraSubtitle(track, tab?.url || "", topicText, tabId),
       ),
     )
   ).filter(isPresent);
@@ -4046,10 +4038,10 @@ async function attachWorkerDomSubtitles(
 async function attachWorkerDomDocuments(
   tabId: number,
   probe: WorkerTabProbe,
-  scan: PlaylistScan,
+  scan: TrackScan,
 ): Promise<void> {
   const existing = scan.discovered.find(
-    (item) => item.itemIndex === probe.itemIndex,
+    (item) => item.topicIndex === probe.topicIndex,
   );
 
   if (existing?.documents) return;
@@ -4059,9 +4051,9 @@ async function attachWorkerDomDocuments(
   if (!domDocuments) return;
 
   if (existing) {
-    await storeDiscoveredItem(
+    await storeDiscoveredTopic(
       probe.scanId,
-      probe.itemIndex,
+      probe.topicIndex,
       { ...existing, documents: domDocuments },
       false,
     );
@@ -4070,14 +4062,14 @@ async function attachWorkerDomDocuments(
   }
 
   const tab = await chrome.tabs.get(tabId).catch(() => null);
-  const itemUrl = scan.items[probe.itemIndex]?.url || "";
+  const topicUrl = scan.items[probe.topicIndex]?.url || "";
 
-  await storeDiscoveredItem(
+  await storeDiscoveredTopic(
     probe.scanId,
-    probe.itemIndex,
+    probe.topicIndex,
     documentsOnlyStream(
-      probe.itemIndex,
-      safeMediaUrl(tab?.url) || itemUrl,
+      probe.topicIndex,
+      safeMediaUrl(tab?.url) || topicUrl,
       domDocuments,
     ),
     false,
@@ -4088,7 +4080,7 @@ async function escalateWorkerProbeQueue(
   tabId: number,
   probe: WorkerTabProbe,
   queuedAfterCurrent: number[],
-): Promise<PlaylistProbeResult> {
+): Promise<TrackProbeResult> {
   if (!queuedAfterCurrent.length || probe.triedApiEscalation) {
     return Object.freeze({
       ok: false,
@@ -4106,7 +4098,7 @@ async function escalateWorkerProbeQueue(
     }),
   });
 
-  return probePlaylistItemsInTab(probe.scanId, tabId, queuedAfterCurrent);
+  return probeTrackTopicsInTab(probe.scanId, tabId, queuedAfterCurrent);
 }
 
 /**
@@ -4119,7 +4111,7 @@ async function advanceWorkerProbe(tabId: number): Promise<void> {
   const probe = await getTabProbe(tabId);
 
   if (!probe) return;
-  const scan = await getPlaylistScan(probe.scanId);
+  const scan = await getTrackScan(probe.scanId);
 
   if (!scan || scan.status !== "scanning") {
     await closeWorker(tabId, probe.workerWindowId ?? null);
@@ -4130,7 +4122,7 @@ async function advanceWorkerProbe(tabId: number): Promise<void> {
   await attachWorkerDomSubtitles(tabId, probe, scan);
   await attachWorkerDomDocuments(tabId, probe, scan);
   if (await tryFollowLinkedVideoInWorker(tabId, probe)) return;
-  await incrementCheckedItemCount(probe.scanId);
+  await incrementCheckedTopicCount(probe.scanId);
 
   const queuedAfterCurrent = probe.queue.slice(probe.queuePos + 1);
 
@@ -4155,7 +4147,7 @@ async function advanceWorkerProbe(tabId: number): Promise<void> {
       probe.workerWindowId ?? null,
     );
 
-    if (allWorkersDone) await markPlaylistScanReady(probe.scanId);
+    if (allWorkersDone) await markTrackScanReady(probe.scanId);
 
     return;
   }
@@ -4168,10 +4160,10 @@ async function advanceWorkerProbe(tabId: number): Promise<void> {
     unresolvedLinks,
   );
 
-  const nextItemIndex = ownedQueue[0];
-  const nextItem = scan.items[nextItemIndex];
-  const nextLinkedUrl = safeMediaUrl(unresolvedLinks[String(nextItemIndex)]);
-  const rawNextNavIndex = nextItem.navigationIndex;
+  const nextTopicIndex = ownedQueue[0];
+  const nextTopic = scan.items[nextTopicIndex];
+  const nextLinkedUrl = safeMediaUrl(unresolvedLinks[String(nextTopicIndex)]);
+  const rawNextNavIndex = nextTopic.navigationIndex;
 
   const nextNavIndex =
     typeof rawNextNavIndex === "number" && Number.isSafeInteger(rawNextNavIndex)
@@ -4189,10 +4181,10 @@ async function advanceWorkerProbe(tabId: number): Promise<void> {
       unresolvedLinks,
       queue: ownedQueue,
       queuePos: 0,
-      itemIndex: nextItemIndex,
+      topicIndex: nextTopicIndex,
       navigationIndex: nextNavIndex,
-      itemTitle: nextItem.fileTitle,
-      itemSection: nextItem.folderPath.at(-1) || "",
+      topicTitle: nextTopic.fileTitle,
+      topicSection: nextTopic.folderPath.at(-1) || "",
       linkedTitle: "",
       previousStreamKey: probe.lastStreamKey || probe.previousStreamKey || "",
       streamCaptured: false,
@@ -4211,7 +4203,7 @@ async function advanceWorkerProbe(tabId: number): Promise<void> {
   await dispatchNextWorkerStep(
     tabId,
     probe,
-    nextItem,
+    nextTopic,
     nextLinkedUrl,
     returningFromLinkedPage,
   );
@@ -4271,8 +4263,8 @@ async function inspectPlaylist(
     return playlistMetadata(await response.text(), resolvedUrl);
   }
 
-  if (validTabId(sourceTabId) && isPlaylistPage(sourceUrl)) {
-    const pageResponse = await fetchFromPlaylistPage(
+  if (validTabId(sourceTabId) && isTrackPage(sourceUrl)) {
+    const pageResponse = await fetchFromTrackPage(
       sourceTabId,
       safeUrl,
       "text",
@@ -4340,7 +4332,7 @@ async function capturedInHiddenFrame(
     frameProbe.sourceUrl,
     [],
     frameProbe.ruleId,
-    frameProbe.itemTitle,
+    frameProbe.topicTitle,
     details.tabId,
   );
 
@@ -4536,7 +4528,7 @@ async function recordSubtitle(
     const track = await resolveExtraSubtitle(
       details.url,
       frameProbe.sourceUrl,
-      frameProbe.itemTitle,
+      frameProbe.topicTitle,
       details.tabId,
     );
 
@@ -4591,7 +4583,7 @@ async function recordPageSubtitles(
           resolveExtraSubtitle(
             candidate,
             frameProbe.sourceUrl,
-            frameProbe.itemTitle,
+            frameProbe.topicTitle,
             tabId,
           ),
         ),
@@ -4689,7 +4681,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
 });
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  const navigationMatch = /^playlist-navigate:(\d+)$/.exec(alarm.name);
+  const navigationMatch = /^track-navigate:(\d+)$/.exec(alarm.name);
 
   if (navigationMatch) {
     triggerProbeNavigation(Number(navigationMatch[1])).catch(() => {});
@@ -4697,7 +4689,7 @@ chrome.alarms.onAlarm.addListener((alarm) => {
     return;
   }
 
-  const match = /^playlist-probe:(\d+)$/.exec(alarm.name);
+  const match = /^track-probe:(\d+)$/.exec(alarm.name);
 
   if (match) advanceWorkerProbe(Number(match[1])).catch(() => {});
 });
@@ -4730,12 +4722,12 @@ const extensionOnlyMessages = new Set([
   "release-download-target",
   "take-download-request",
   "fetch-source-media",
-  "start-playlist-scan",
-  "get-playlist-scan",
-  "open-playlist-download",
-  "take-playlist-download",
-  "complete-playlist-download-item",
-  "update-playlist-download-preferences",
+  "start-track-scan",
+  "get-track-scan",
+  "open-track-download",
+  "take-track-download",
+  "complete-track-download-topic",
+  "update-track-download-preferences",
   "set-download-tab-keepalive",
   "export-diagram-svg",
   "export-slides-pdf",
@@ -4747,7 +4739,7 @@ function resolveActiveHeadlessProbe(
 ): ActiveHeadlessProbe | null {
   if (
     sender.tab?.id === undefined ||
-    !isTrustedPlaylistFrameSender(sender, chrome.runtime.id)
+    !isTrustedTrackFrameSender(sender, chrome.runtime.id)
   ) {
     return null;
   }
@@ -4768,82 +4760,82 @@ function resolveActiveHeadlessProbe(
   return active;
 }
 
-function itemsFromOutline(
+function topicsFromOutline(
   outlineRecord: ExternalRecord | null,
   limit?: number,
-): readonly PlaylistItem[] {
-  const rawItems = Array.isArray(outlineRecord?.items)
+): readonly TrackTopic[] {
+  const rawTopics = Array.isArray(outlineRecord?.items)
     ? outlineRecord.items
     : [];
 
-  const validItems = rawItems.filter((item): item is PlaylistItemInput =>
+  const validTopics = rawTopics.filter((item): item is TrackTopicInput =>
     Boolean(safeMediaUrl(externalRecord(item)?.url)),
   );
 
-  return usablePlaylistItems(
-    limit !== undefined ? validItems.slice(0, limit) : validItems,
+  return usableTrackTopics(
+    limit !== undefined ? validTopics.slice(0, limit) : validTopics,
   );
 }
 
-function handleOpenPlaylistDownload(
+function handleOpenTrackDownload(
   message: ExternalRecord,
   sendResponse: RuntimeMessageResponse,
 ): boolean {
-  getPlaylistScan(String(message.scanId))
+  getTrackScan(String(message.scanId))
     .then(async (scan) => {
       if (!scan?.discovered?.length) {
-        throw new Error("No stream items are ready to download.");
+        throw new Error("No stream topics are ready to download.");
       }
 
-      const selectedSet = Array.isArray(message.selectedItemIndices)
+      const selectedSet = Array.isArray(message.selectedTopicIndices)
         ? new Set(
-            message.selectedItemIndices.filter(
+            message.selectedTopicIndices.filter(
               (value): value is number =>
                 typeof value === "number" && Number.isSafeInteger(value),
             ),
           )
         : null;
 
-      const selectedItems = [...scan.discovered]
-        .sort((left, right) => left.itemIndex - right.itemIndex)
-        .filter((item) => !selectedSet || selectedSet.has(item.itemIndex));
+      const selectedTopics = [...scan.discovered]
+        .sort((left, right) => left.topicIndex - right.topicIndex)
+        .filter((item) => !selectedSet || selectedSet.has(item.topicIndex));
 
-      if (!selectedItems.length) {
-        throw new Error("Select at least one item to download.");
+      if (!selectedTopics.length) {
+        throw new Error("Select at least one topic to download.");
       }
 
-      const playlistDownloadMode = playlistDownloadModeOrDefault(
-        message.playlistDownloadMode,
+      const trackDownloadMode = trackDownloadModeOrDefault(
+        message.trackDownloadMode,
       );
 
-      const queuedItems = selectedItems.filter((item) =>
-        isItemDownloadableForMode(item, playlistDownloadMode),
+      const queuedTopics = selectedTopics.filter((item) =>
+        isTopicDownloadableForMode(item, trackDownloadMode),
       );
 
-      if (!queuedItems.length) {
+      if (!queuedTopics.length) {
         throw new Error(
-          "No downloadable item documents or streams were found.",
+          "No downloadable topic documents or streams were found.",
         );
       }
 
-      const playlistDownloadId = crypto.randomUUID();
+      const trackDownloadId = crypto.randomUUID();
 
       await chrome.storage.session.set({
-        [`playlist-download:${playlistDownloadId}`]: {
+        [`track-download:${trackDownloadId}`]: {
           title: scan.title,
-          items: queuedItems,
+          items: queuedTopics,
           sourceTabId: scan.sourceTabId ?? null,
-          completedItemIndices: [],
-          playlistDownloadMode,
+          completedTopicIndices: [],
+          trackDownloadMode,
           outputFormat: outputFormatOrDefault(
             typeof message.outputFormat === "string"
               ? message.outputFormat
               : DEFAULT_DOWNLOAD_PREFERENCES.outputFormat,
           ),
-          playlistQualityPreference: playlistQualityPreferenceOrDefault(
-            typeof message.playlistQualityPreference === "string"
-              ? message.playlistQualityPreference
-              : DEFAULT_DOWNLOAD_PREFERENCES.playlistQualityPreference,
+          trackQualityPreference: trackQualityPreferenceOrDefault(
+            typeof message.trackQualityPreference === "string"
+              ? message.trackQualityPreference
+              : DEFAULT_DOWNLOAD_PREFERENCES.trackQualityPreference,
           ),
           subtitleDownloadPreference: subtitleDownloadPreferenceOrDefault(
             typeof message.subtitleDownloadPreference === "string"
@@ -4857,9 +4849,7 @@ function handleOpenPlaylistDownload(
       });
 
       await chrome.tabs.create({
-        url: chrome.runtime.getURL(
-          `src/index.html?playlist=${playlistDownloadId}`,
-        ),
+        url: chrome.runtime.getURL(`src/index.html?track=${trackDownloadId}`),
       });
 
       sendResponse({ ok: true });
@@ -5755,7 +5745,7 @@ function handlePageMediaResult(
 ): boolean {
   if (
     sender.tab?.id === undefined ||
-    !isTrustedPlaylistSender(sender, chrome.runtime.id)
+    !isTrustedTrackSender(sender, chrome.runtime.id)
   ) {
     return false;
   }
@@ -5817,12 +5807,12 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
           return {
             ...state,
             subtitles: uniqueSubtitles([...state.subtitles, ...pageTracks]),
-            playlistOutline: stored[outlineKey(tabId)] || null,
+            trackOutline: stored[outlineKey(tabId)] || null,
           };
         })
         .then((payload) => sendResponse(payload))
         .catch(() =>
-          sendResponse({ streams: [], subtitles: [], playlistOutline: null }),
+          sendResponse({ streams: [], subtitles: [], trackOutline: null }),
         );
 
       return true;
@@ -5962,13 +5952,13 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
         return false;
       }
 
-      fetchFromPlaylistPage(sourceTabId, mediaUrl, responseType)
+      fetchFromTrackPage(sourceTabId, mediaUrl, responseType)
         .then((response) => sendResponse({ ...response, handled: true }))
         .catch((error: unknown) =>
           sendResponse({
             error: errorMessage(
               error,
-              "Could not use the signed-in playlist tab.",
+              "Could not use the signed-in track tab.",
             ),
             handled: true,
           }),
@@ -6037,7 +6027,7 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
         (rawUrl) => Boolean(safeMediaUrl(rawUrl)),
       );
     },
-    "page-playlist-stream"(message, sender, sendResponse) {
+    "page-track-stream"(message, sender, sendResponse) {
       const tabId = sender.tab?.id;
 
       if (!validTabId(tabId)) return false;
@@ -6049,33 +6039,32 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
 
       if (
         !isRegisteredProbeFrame &&
-        !isTrustedPlaylistFrameSender(sender, chrome.runtime.id)
+        !isTrustedTrackFrameSender(sender, chrome.runtime.id)
       ) {
         return false;
       }
 
       const stream = (externalRecord(message.stream) ||
-        {}) as PlaylistStreamSignal;
+        {}) as TrackStreamSignal;
 
-      recordPlaylistStream(tabId, stream, sender.frameId ?? 0)
+      recordTrackStream(tabId, stream, sender.frameId ?? 0)
         .then(() => sendResponse({ ok: true }))
         .catch(() => sendResponse({ ok: false }));
 
       return true;
     },
-    "playlist-item-probed"(message, sender, sendResponse) {
+    "track-topic-probed"(message, sender, sendResponse) {
       const active = resolveActiveHeadlessProbe(message, sender);
-      const itemIndex = message.itemIndex;
+      const topicIndex = message.topicIndex;
 
       if (
         active &&
-        typeof itemIndex === "number" &&
-        Number.isInteger(itemIndex)
+        typeof topicIndex === "number" &&
+        Number.isInteger(topicIndex)
       ) {
-        active.onItem(
-          itemIndex,
-          (externalRecord(message.stream) as PlaylistStreamSignal | null) ||
-            null,
+        active.onTopic(
+          topicIndex,
+          (externalRecord(message.stream) as TrackStreamSignal | null) || null,
           message.partial === true,
         );
 
@@ -6088,7 +6077,7 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
 
       return false;
     },
-    "playlist-items-probe-done"(message, sender, sendResponse) {
+    "track-topics-probe-done"(message, sender, sendResponse) {
       const active = resolveActiveHeadlessProbe(message, sender);
 
       if (!active) {
@@ -6110,22 +6099,22 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
 
       return false;
     },
-    "playlist-outline"(message, sender, sendResponse) {
+    "track-outline"(message, sender, sendResponse) {
       const tabId = sender.tab?.id;
 
       if (
         tabId === undefined ||
-        !isTrustedPlaylistSender(sender, chrome.runtime.id)
+        !isTrustedTrackSender(sender, chrome.runtime.id)
       ) {
         return false;
       }
 
       const outlineRecord = externalRecord(message.outline);
-      const items = itemsFromOutline(outlineRecord, 500);
+      const items = topicsFromOutline(outlineRecord, 500);
       const pageUrl = typeof sender.url === "string" ? sender.url : "";
 
       const outline = {
-        title: boundedText(outlineRecord?.title, 240) || "Playlist",
+        title: boundedText(outlineRecord?.title, 240) || "Track",
         items,
         pageUrl,
       };
@@ -6155,13 +6144,13 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
 
       return true;
     },
-    "start-playlist-scan"(message, _sender, sendResponse) {
+    "start-track-scan"(message, _sender, sendResponse) {
       const outlineRecord = externalRecord(message.outline);
-      const items = itemsFromOutline(outlineRecord);
+      const items = topicsFromOutline(outlineRecord);
 
       if (!items.length) {
         sendResponse({
-          error: "No item links were found on this playlist page.",
+          error: "No topic links were found on this track page.",
         });
 
         return false;
@@ -6173,25 +6162,25 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
         ? message.sourceTabId
         : null;
 
-      const scan: PlaylistScan = {
+      const scan: TrackScan = {
         id: crypto.randomUUID(),
-        title: typeof rawTitle === "string" && rawTitle ? rawTitle : "Playlist",
+        title: typeof rawTitle === "string" && rawTitle ? rawTitle : "Track",
         items,
         discovered: [],
-        nextItemIndex: 0,
-        currentItemIndex: null,
+        nextTopicIndex: 0,
+        currentTopicIndex: null,
         status: "scanning",
         sourceTabId,
         startedAt: Date.now(),
       };
 
-      setPlaylistScan(scan)
+      setTrackScan(scan)
         .then(async () => {
           await chrome.tabs.create({
-            url: chrome.runtime.getURL(`src/playlist.html?scan=${scan.id}`),
+            url: chrome.runtime.getURL(`src/track.html?scan=${scan.id}`),
           });
 
-          runHeadlessPlaylistScan(scan.id, sourceTabId).catch(() => {});
+          runHeadlessTrackScan(scan.id, sourceTabId).catch(() => {});
           sendResponse({ scanId: scan.id });
         })
         .catch((error: unknown) =>
@@ -6200,8 +6189,8 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
 
       return true;
     },
-    "get-playlist-scan"(message, _sender, sendResponse) {
-      getPlaylistScan(String(message.scanId)).then((scan) =>
+    "get-track-scan"(message, _sender, sendResponse) {
+      getTrackScan(String(message.scanId)).then((scan) =>
         sendResponse({ scan }),
       );
 
@@ -6239,8 +6228,8 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
 
       return true;
     },
-    "open-playlist-download"(message, _sender, sendResponse) {
-      return handleOpenPlaylistDownload(message, sendResponse);
+    "open-track-download"(message, _sender, sendResponse) {
+      return handleOpenTrackDownload(message, sendResponse);
     },
     "export-diagram-svg"(message, sender, sendResponse) {
       const rawUrl = typeof message.url === "string" ? message.url : "";
@@ -6266,20 +6255,20 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
         sendResponse,
       );
     },
-    "take-playlist-download"(message, _sender, sendResponse) {
-      const key = `playlist-download:${String(message.playlistDownloadId)}`;
+    "take-track-download"(message, _sender, sendResponse) {
+      const key = `track-download:${String(message.trackDownloadId)}`;
 
       chrome.storage.session.get(key).then((stored) => {
-        sendResponse({ playlistDownload: stored[key] || null });
+        sendResponse({ trackDownload: stored[key] || null });
       });
 
       return true;
     },
-    "complete-playlist-download-item"(message, _sender, sendResponse) {
-      const key = `playlist-download:${String(message.playlistDownloadId)}`;
-      const itemIndex = message.itemIndex;
+    "complete-track-download-topic"(message, _sender, sendResponse) {
+      const key = `track-download:${String(message.trackDownloadId)}`;
+      const topicIndex = message.topicIndex;
 
-      if (typeof itemIndex !== "number" || !Number.isInteger(itemIndex)) {
+      if (typeof topicIndex !== "number" || !Number.isInteger(topicIndex)) {
         sendResponse({ ok: false });
 
         return false;
@@ -6292,19 +6281,19 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
 
           if (!current) return;
 
-          const existing = Array.isArray(current.completedItemIndices)
-            ? current.completedItemIndices.filter(
+          const existing = Array.isArray(current.completedTopicIndices)
+            ? current.completedTopicIndices.filter(
                 (idx): idx is number =>
                   typeof idx === "number" && Number.isInteger(idx),
               )
             : [];
 
-          if (existing.includes(itemIndex)) return;
+          if (existing.includes(topicIndex)) return;
 
           await chrome.storage.session.set({
             [key]: {
               ...current,
-              completedItemIndices: [...existing, itemIndex],
+              completedTopicIndices: [...existing, topicIndex],
             },
           });
         })
@@ -6313,19 +6302,19 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
 
       return true;
     },
-    "update-playlist-download-preferences"(message, _sender, sendResponse) {
-      const playlistDownloadId =
-        typeof message.playlistDownloadId === "string"
-          ? message.playlistDownloadId
+    "update-track-download-preferences"(message, _sender, sendResponse) {
+      const trackDownloadId =
+        typeof message.trackDownloadId === "string"
+          ? message.trackDownloadId
           : "";
 
-      if (!playlistDownloadId) {
+      if (!trackDownloadId) {
         sendResponse({ ok: false });
 
         return false;
       }
 
-      const key = `playlist-download:${playlistDownloadId}`;
+      const key = `track-download:${trackDownloadId}`;
 
       chrome.storage.session
         .get(key)
@@ -6335,7 +6324,7 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
           if (!current) return;
 
           await chrome.storage.session.set({
-            [key]: mergePlaylistDownloadPreferences(current, message),
+            [key]: mergeTrackDownloadPreferences(current, message),
           });
         })
         .then(() => sendResponse({ ok: true }))
@@ -6345,7 +6334,7 @@ const runtimeMessageHandlers: Readonly<Record<string, RuntimeMessageHandler>> =
     },
   });
 
-function updatedPlaylistQualityPreference(
+function updatedTrackQualityPreference(
   rawValue: unknown,
   fallback: unknown,
 ): string | undefined {
@@ -6365,7 +6354,7 @@ function updatedPlaylistQualityPreference(
   return existing;
 }
 
-function mergePlaylistDownloadPreferences(
+function mergeTrackDownloadPreferences(
   current: ExternalRecord,
   message: ExternalRecord,
 ): ExternalRecord {
@@ -6380,9 +6369,9 @@ function mergePlaylistDownloadPreferences(
     ? clampConcurrency(numericConcurrency)
     : current.segmentConcurrency;
 
-  const playlistQualityPreference = updatedPlaylistQualityPreference(
-    message.playlistQualityPreference,
-    current.playlistQualityPreference,
+  const trackQualityPreference = updatedTrackQualityPreference(
+    message.trackQualityPreference,
+    current.trackQualityPreference,
   );
 
   const preferredQualityLabel =
@@ -6394,7 +6383,7 @@ function mergePlaylistDownloadPreferences(
     ...current,
     outputFormat,
     segmentConcurrency,
-    ...(playlistQualityPreference ? { playlistQualityPreference } : {}),
+    ...(trackQualityPreference ? { trackQualityPreference } : {}),
     ...(typeof preferredQualityLabel === "string"
       ? { preferredQualityLabel }
       : {}),

@@ -81,34 +81,32 @@ export async function runMaterialsOnlyCourseFromCoursePage(
 
   try {
     await coursePage.goto(
-      `chrome-extension://${extensionId}/src/playlist.html?scan=${scanId}`,
+      `chrome-extension://${extensionId}/src/track.html?scan=${scanId}`,
     );
 
-    await expect(coursePage.locator("#playlist-download-mode")).toHaveValue(
-      "all",
-    );
+    await expect(coursePage.locator("#track-download-mode")).toHaveValue("all");
 
     await expect(coursePage.locator("#selection-count")).toHaveText(
-      "2 of 2 items selected",
+      "2 of 2 topics selected",
     );
 
     await expect(coursePage.locator("#download-all")).toBeEnabled();
 
     await expect(coursePage.locator("#download-all")).toHaveText(
-      "Download all 2 items",
+      "Download all 2 topics",
     );
 
-    await expect(coursePage.locator(".item-select").first()).toBeChecked();
+    await expect(coursePage.locator(".topic-select").first()).toBeChecked();
 
-    await coursePage.selectOption("#playlist-download-mode", "documents");
+    await coursePage.selectOption("#track-download-mode", "documents");
     await expect(coursePage.locator("#format")).toBeDisabled();
     await expect(coursePage.locator("#download-all")).toBeEnabled();
 
-    await coursePage.selectOption("#playlist-download-mode", "all");
+    await coursePage.selectOption("#track-download-mode", "all");
     await expect(coursePage.locator("#format")).toBeEnabled();
     await expect(coursePage.locator("#download-all")).toBeEnabled();
 
-    await expect(coursePage.locator(".item-meta").first()).toContainText(
+    await expect(coursePage.locator(".topic-meta").first()).toContainText(
       "MD · 1 PDF · 1 image · 1 diagram · 1 slides",
     );
 
@@ -119,7 +117,7 @@ export async function runMaterialsOnlyCourseFromCoursePage(
 
     try {
       await expect(queuePage.locator("#message")).toHaveText(
-        "Playlist download finished",
+        "Track download finished",
         { timeout: 30000 },
       );
 

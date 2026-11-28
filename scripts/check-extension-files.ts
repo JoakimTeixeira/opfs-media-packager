@@ -17,11 +17,7 @@ interface BundleSourceMap {
   readonly sources: readonly string[];
 }
 
-const pages = [
-  "src/popup.html",
-  "src/index.html",
-  "src/playlist.html",
-] as const;
+const pages = ["src/popup.html", "src/index.html", "src/track.html"] as const;
 
 const manifest = JSON.parse(
   readFileSync("manifest.json", "utf8"),
@@ -68,8 +64,8 @@ const bundles = [
   "app",
   "background",
   "content",
-  "page-playlist-probe",
-  "playlist",
+  "page-track-probe",
+  "track",
   "popup",
 ];
 

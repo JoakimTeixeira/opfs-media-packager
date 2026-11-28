@@ -1,4 +1,4 @@
-import { isPlaylistPage } from "../playlist/playlist-adapters.ts";
+import { isTrackPage } from "../track/track-adapters.ts";
 import { safeMediaUrl } from "../security/security.ts";
 
 interface AuthorizationHeader {
@@ -62,7 +62,7 @@ function hlsAssetDirectory(pathname: string): string | null {
 
 /**
  * Creates a session rule for one selected media asset. The rule preserves the
- * signed-in playlist-page referer only for a recognized playlist route and its
+ * signed-in track-page referer only for a recognized track route and its
  * matching CDN asset directory.
  */
 export function playlistMediaAuthorizationRule(
@@ -80,7 +80,7 @@ export function playlistMediaAuthorizationRule(
   const media = new URL(safeMedia);
   const source = new URL(safeSource);
 
-  if (!isPlaylistPage(source.href)) return null;
+  if (!isTrackPage(source.href)) return null;
   const assetDirectory = hlsAssetDirectory(media.pathname);
 
   if (!assetDirectory) return null;

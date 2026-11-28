@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { harness } from "../tests/integration/playlist/__mocks__/headless-playlist-scan-setup.ts";
+import { harness } from "../tests/integration/track/__mocks__/headless-track-scan-setup.ts";
 
 test("should reject privileged requests from a different extension", async () => {
   harness.reset();

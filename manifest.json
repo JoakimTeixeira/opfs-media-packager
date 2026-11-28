@@ -35,7 +35,7 @@
     },
     {
       "matches": ["https://*/courses/*", "https://*/c/*/sections/*/lessons/*"],
-      "js": ["dist/page-playlist-probe.js"],
+      "js": ["dist/page-track-probe.js"],
       "all_frames": true,
       "run_at": "document_start",
       "world": "MAIN"

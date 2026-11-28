@@ -31,29 +31,29 @@ Prerequisites: Node.js 26.13.0 with npm and Google Chrome 120 or newer. Node.js 
 2. Run `npm run setup:hooks` to enable the repository's pre-commit checks.
 3. Run `npm run build` to create the files in `dist/`.
 4. Open `chrome://extensions`, enable **Developer mode**, select **Load unpacked**, and choose this project folder.
-5. Reload an open video or playlist tab so Chrome attaches the page detector. For unattended saves, turn off Chrome's **Ask where to save each file before downloading** setting in `chrome://settings/downloads`.
+5. Reload an open video or track tab so Chrome attaches the page detector. For unattended saves, turn off Chrome's **Ask where to save each file before downloading** setting in `chrome://settings/downloads`.
 
 ## Use
 
-| Task                    | Steps                                                                                                                     | Result                                                                                                                                      |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| Download one video      | Play the video briefly. Open the extension popup. Choose a quality, subtitle, and output format. Select **Download**.     | MP4 is the default. MP4 saves a matching `.vtt` subtitle file when one is selected. MKV places the selected subtitle inside the video file. |
-| Download a playlist     | Open a playlist page. Select **Scan**. Review the items on the Playlist page. Select the content and choose **Download**. | The extension creates folders from the playlist sections and saves each selected item in order.                                             |
-| Stop and continue later | Select **Cancel** on the Downloader page. Change settings if needed. Select **Resume playlist**.                          | Completed items remain completed. The queue continues at the next unfinished item. Completed video pieces can be reused.                    |
+| Task                    | Steps                                                                                                                 | Result                                                                                                                                      |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Download one video      | Play the video briefly. Open the extension popup. Choose a quality, subtitle, and output format. Select **Download**. | MP4 is the default. MP4 saves a matching `.vtt` subtitle file when one is selected. MKV places the selected subtitle inside the video file. |
+| Download a playlist     | Open a track page. Select **Scan**. Review the items on the Track page. Select the content and choose **Download**.   | The extension creates folders from the playlist sections and saves each selected item in order.                                             |
+| Stop and continue later | Select **Cancel** on the Downloader page. Change settings if needed. Select **Resume playlist**.                      | Completed items remain completed. The queue continues at the next unfinished item. Completed video pieces can be reused.                    |
 
 ## Key terms
 
-| Term           | Meaning                                                                                                                                           |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| HLS manifest   | A `.m3u8` file listing a video's quality options or sequential segments.                                                                          |
-| Video stream   | One video shown in the popup. A stream can include several quality options.                                                                       |
-| Segment        | One small sequential part of an HLS video.                                                                                                        |
-| OPFS           | Chrome's private disk area for the extension. It holds temporary video pieces while a download runs.                                              |
-| Remux          | FFmpeg copies the downloaded audio and video into MP4 or MKV without changing picture or sound quality.                                           |
-| Playlist scan  | A background check that finds playlist items, videos, subtitles, and companion documents. A minimized worker window is used when a page needs it. |
-| Playlist queue | The ordered list of playlist items waiting to download.                                                                                           |
+| Term         | Meaning                                                                                                                                         |
+| ------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| HLS manifest | A `.m3u8` file listing a video's quality options or sequential segments.                                                                        |
+| Video stream | One video shown in the popup. A stream can include several quality options.                                                                     |
+| Segment      | One small sequential part of an HLS video.                                                                                                      |
+| OPFS         | Chrome's private disk area for the extension. It holds temporary video pieces while a download runs.                                            |
+| Remux        | FFmpeg copies the downloaded audio and video into MP4 or MKV without changing picture or sound quality.                                         |
+| Track scan   | A background check that finds track topics, videos, subtitles, and companion documents. A minimized worker window is used when a page needs it. |
+| Track queue  | The ordered list of track topics waiting to download.                                                                                           |
 
-## Playlist queue behaviour
+## Track queue behaviour
 
 Every item finishes with one result: **completed**, **cancelled**, or **failed**. A cancelled item remains unfinished and keeps the saved resume point. A failed item is classified so the queue can respond appropriately.
 
@@ -64,7 +64,7 @@ Every item finishes with one result: **completed**, **cancelled**, or **failed**
 | Rate-limited     | The host returned HTTP 429 or 503, meaning it asked the extension to slow down or is temporarily unavailable. | Pause the queue immediately and preserve progress. Wait a few minutes, then resume.                                            |
 | Engine           | The local download or FFmpeg engine could not finish.                                                         | Pause the queue and show the action needed before a resume.                                                                    |
 
-The download coordinator records item outcomes. The playlist scanner discovers items and slows or stops when the host asks for fewer requests. These workflows have different retry policies. The [architecture map](docs/project-map.md) identifies their entry points.
+The download coordinator records item outcomes. The track scanner discovers items and slows or stops when the host asks for fewer requests. These workflows have different retry policies. The [architecture map](docs/project-map.md) identifies their entry points.
 
 ## Architecture and engineering approach
 

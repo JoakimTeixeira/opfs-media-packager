@@ -20,18 +20,18 @@ test("should skip already-downloaded videos, subtitles, and materials on playlis
     const createPlan = (origin: string) => ({
       title: "Skip Existing Course",
       outputFormat: "mp4",
-      playlistQualityPreference: "best",
+      trackQualityPreference: "best",
       subtitleDownloadPreference: "include",
       segmentConcurrency: 3,
-      completedItemIndices: [],
+      completedTopicIndices: [],
       items: [
         {
-          itemIndex: 0,
+          topicIndex: 0,
           title: "1.1 Intro",
           url: `${origin}/video/playlist.m3u8`,
           sourceUrl: `${origin}/c/skip/sections/1/lessons/1`,
           kind: "media",
-          folderPath: ["(Playlist) Skip Existing"],
+          folderPath: ["(Track) Skip Existing"],
           qualityOptions: [
             { label: "720p", url: `${origin}/video/playlist.m3u8` },
           ],
@@ -58,12 +58,12 @@ test("should skip already-downloaded videos, subtitles, and materials on playlis
           },
         },
         {
-          itemIndex: 1,
+          topicIndex: 1,
           title: "1.2 Direct Event",
           url: `${origin}/video/live-event.mp4`,
           sourceUrl: `${origin}/c/skip/sections/1/lessons/2`,
           kind: "direct",
-          folderPath: ["(Playlist) Skip Existing"],
+          folderPath: ["(Track) Skip Existing"],
           qualityOptions: [],
           subtitles: [],
           documents: {
@@ -80,9 +80,9 @@ test("should skip already-downloaded videos, subtitles, and materials on playlis
     await setupPage.evaluate(
       async ({ plan1, plan2, plan3 }) => {
         await chrome.storage.session.set({
-          "playlist-download:skip-1": plan1,
-          "playlist-download:skip-2": plan2,
-          "playlist-download:skip-3": plan3,
+          "track-download:skip-1": plan1,
+          "track-download:skip-2": plan2,
+          "track-download:skip-3": plan3,
         });
       },
       {
@@ -100,18 +100,18 @@ test("should skip already-downloaded videos, subtitles, and materials on playlis
       await cdp.send("Browser.setDownloadBehavior", { behavior: "default" });
 
       await downloadPage.goto(
-        `chrome-extension://${extensionId}/src/index.html?playlist=skip-1`,
+        `chrome-extension://${extensionId}/src/index.html?track=skip-1`,
       );
 
       await expect(downloadPage.locator("#message")).toHaveText(
-        "Playlist download finished",
+        "Track download finished",
         { timeout: 30000 },
       );
 
       const courseDir = join(
         downloadsDir,
         "HLS Videos",
-        "(Playlist) Skip Existing",
+        "(Track) Skip Existing",
       );
 
       const firstRunFiles = await readdir(courseDir);
@@ -135,16 +135,16 @@ test("should skip already-downloaded videos, subtitles, and materials on playlis
 
       // Re-run the playlist with a fresh course plan: every existing file must be skipped!
       await downloadPage.goto(
-        `chrome-extension://${extensionId}/src/index.html?playlist=skip-2`,
+        `chrome-extension://${extensionId}/src/index.html?track=skip-2`,
       );
 
       await expect(downloadPage.locator("#message")).toHaveText(
-        "Playlist download finished",
+        "Track download finished",
         { timeout: 15000 },
       );
 
-      await expect(downloadPage.locator("#playlist-download-note")).toHaveText(
-        "2 items already downloaded (skipped).",
+      await expect(downloadPage.locator("#track-download-note")).toHaveText(
+        "2 topics already downloaded (skipped).",
       );
 
       expect(server.hitCount("seg0")).toBe(segHitsBefore);
@@ -172,11 +172,11 @@ test("should skip already-downloaded videos, subtitles, and materials on playlis
       }).toPass({ timeout: 25000 });
 
       await downloadPage.goto(
-        `chrome-extension://${extensionId}/src/index.html?playlist=skip-3`,
+        `chrome-extension://${extensionId}/src/index.html?track=skip-3`,
       );
 
       await expect(downloadPage.locator("#message")).toHaveText(
-        "Playlist download finished",
+        "Track download finished",
         { timeout: 15000 },
       );
 

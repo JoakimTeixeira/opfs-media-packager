@@ -13,19 +13,19 @@ import {
 } from "./hls-parser.ts";
 import { downloadControlState } from "../lib/downloads/download-control-state.ts";
 import {
-  shouldHaltPlaylistQueue,
-  type PlaylistQueueState,
-} from "../lib/playlist/playlist-queue-policy.ts";
+  shouldHaltTrackQueue,
+  type TrackQueueState,
+} from "../lib/track/track-queue-policy.ts";
 import {
   DEFAULT_DOWNLOAD_PREFERENCES,
   DEFAULT_OUTPUT_FORMAT,
   OUTPUT_FORMAT_OPTIONS,
   SEGMENT_CONCURRENCY_OPTIONS,
-  playlistDownloadModeOrDefault,
-  playlistQualityPreferenceFromLabel,
+  trackDownloadModeOrDefault,
+  trackQualityPreferenceFromLabel,
   outputFormatOrDefault,
   renderPreferenceOptions,
-  type PlaylistDownloadMode,
+  type TrackDownloadMode,
   type OutputFormat,
 } from "../lib/downloads/download-preferences.ts";
 import {
@@ -68,18 +68,18 @@ import {
 } from "../lib/downloads/large-file-remux.ts";
 import {
   canonicalDocumentUrlKey,
-  countItemCompanionDocuments,
+  countTopicCompanionDocuments,
   prefixedDocumentFilename,
-  type ItemFileAsset,
-  type ItemLinkAsset,
-  type ItemMarkdownNote,
-  type ItemCompanionDocuments,
-} from "../lib/materials/item-assets.ts";
+  type TopicFileAsset,
+  type TopicLinkAsset,
+  type TopicMarkdownNote,
+  type TopicCompanionDocuments,
+} from "../lib/materials/topic-assets.ts";
 import {
   annotateMarkdownWithDownloadedArtifacts,
-  cleanItemMarkdown,
+  cleanTopicMarkdown,
   type DownloadedArtifactAnnotation,
-} from "../lib/materials/item-markdown.ts";
+} from "../lib/materials/topic-markdown.ts";
 import { fetchDirectMedia as fetchDirectMediaRequest } from "../lib/media/media-request.ts";
 import { safeMediaUrl } from "../lib/security/security.ts";
 import {
@@ -113,7 +113,7 @@ interface SourcePageFetchResponse {
   readonly error?: string;
 }
 
-interface PlaylistExtraVideoDownload {
+interface TrackExtraVideoDownload {
   readonly url: string;
   readonly title: string;
   readonly sourceUrl?: string;
@@ -122,35 +122,35 @@ interface PlaylistExtraVideoDownload {
   readonly subtitles?: readonly KnownSubtitleTrack[];
 }
 
-interface SavedItemVideoArtifact {
+interface SavedTopicVideoArtifact {
   readonly sourceUrl: string;
   readonly filename: string;
 }
 
-interface PlaylistItemDownload {
-  readonly itemIndex?: number;
+interface TrackTopicDownload {
+  readonly topicIndex?: number;
   readonly url?: string;
   readonly title?: string;
   readonly primaryVideoTitle?: string;
-  readonly extraVideos?: readonly PlaylistExtraVideoDownload[];
+  readonly extraVideos?: readonly TrackExtraVideoDownload[];
   readonly sourceUrl?: string;
   readonly kind?: "master" | "media" | "direct";
   readonly folderPath?: readonly string[];
   readonly qualityOptions?: readonly VideoQualityOption[];
   readonly subtitles?: readonly KnownSubtitleTrack[];
-  readonly documents?: ItemCompanionDocuments;
+  readonly documents?: TopicCompanionDocuments;
 }
 
-interface PlaylistDownloadPlan {
+interface TrackDownloadPlan {
   readonly title?: string;
   readonly sourceTabId?: number | null;
-  readonly items?: readonly PlaylistItemDownload[];
-  readonly completedItemIndices?: readonly number[];
+  readonly items?: readonly TrackTopicDownload[];
+  readonly completedTopicIndices?: readonly number[];
   readonly outputFormat?: OutputFormat;
-  readonly playlistQualityPreference?: string;
+  readonly trackQualityPreference?: string;
   readonly preferredQualityLabel?: string;
   readonly subtitleDownloadPreference?: string;
-  readonly playlistDownloadMode?: PlaylistDownloadMode;
+  readonly trackDownloadMode?: TrackDownloadMode;
   readonly segmentConcurrency?: number;
 }
 
@@ -188,9 +188,7 @@ const details = requireElement<HTMLElement>("#details");
 const progress = requireElement<HTMLProgressElement>("#progress");
 const subtitleNote = requireElement<HTMLElement>("#subtitle-note");
 
-const playlistDownloadNote = requireElement<HTMLElement>(
-  "#playlist-download-note",
-);
+const trackDownloadNote = requireElement<HTMLElement>("#track-download-note");
 
 const sourceHost = requireElement<HTMLElement>("#source-host");
 const videoTitle = requireElement<HTMLElement>("#video-title");
@@ -235,14 +233,14 @@ const appState: {
   sourceTabId: number | null;
   autoStart: boolean;
   activeDownloadJob: ActiveDownloadJob | null;
-  activePlaylistDownload: PlaylistDownloadPlan | null;
-  playlistCompletedIndices: Set<number>;
-  playlistDownloadedDocumentsByKey: Map<string, DownloadedDocumentRecord>;
-  playlistExistingDownloads: Set<string> | null;
-  playlistRunActive: boolean;
+  activeTrackDownload: TrackDownloadPlan | null;
+  trackCompletedIndices: Set<number>;
+  trackDownloadedDocumentsByKey: Map<string, DownloadedDocumentRecord>;
+  trackExistingDownloads: Set<string> | null;
+  trackRunActive: boolean;
   userSelectedQualityForUrl: string;
-  playlistDownloadCancelled: boolean;
-  playlistFolderSegments: readonly string[];
+  trackDownloadCancelled: boolean;
+  trackFolderSegments: readonly string[];
   downloadSubfolder: string;
   keepAliveDepth: number;
   activeOpfsJobDir: string | null;
@@ -255,14 +253,14 @@ const appState: {
   sourceTabId: null,
   autoStart: false,
   activeDownloadJob: null,
-  activePlaylistDownload: null,
-  playlistCompletedIndices: new Set<number>(),
-  playlistDownloadedDocumentsByKey: new Map<string, DownloadedDocumentRecord>(),
-  playlistExistingDownloads: null,
-  playlistRunActive: false,
+  activeTrackDownload: null,
+  trackCompletedIndices: new Set<number>(),
+  trackDownloadedDocumentsByKey: new Map<string, DownloadedDocumentRecord>(),
+  trackExistingDownloads: null,
+  trackRunActive: false,
   userSelectedQualityForUrl: "",
-  playlistDownloadCancelled: false,
-  playlistFolderSegments: [],
+  trackDownloadCancelled: false,
+  trackFolderSegments: [],
   downloadSubfolder: DEFAULT_DOWNLOAD_SUBFOLDER,
   keepAliveDepth: 0,
   activeOpfsJobDir: null,
@@ -270,24 +268,23 @@ const appState: {
 
 const runStateKey = "lastDownloadRun";
 
-function hasResumablePlaylistPlan(): boolean {
+function hasResumableTrackPlan(): boolean {
   return Boolean(
-    appState.activePlaylistDownload?.items?.some(
-      (item) =>
-        !isItemAlreadyCompleted(item, appState.playlistCompletedIndices),
+    appState.activeTrackDownload?.items?.some(
+      (item) => !isTopicAlreadyCompleted(item, appState.trackCompletedIndices),
     ),
   );
 }
 
 function updateDownloadButtonLabel(): void {
   downloadLabel.textContent =
-    hasResumablePlaylistPlan() && !appState.playlistRunActive
-      ? "Resume playlist"
+    hasResumableTrackPlan() && !appState.trackRunActive
+      ? "Resume track"
       : "Download";
 }
 
-function syncPlaylistPreferencesFromControls(): void {
-  const active = appState.activePlaylistDownload;
+function syncTrackPreferencesFromControls(): void {
+  const active = appState.activeTrackDownload;
 
   if (!active) return;
 
@@ -301,29 +298,29 @@ function syncPlaylistPreferencesFromControls(): void {
     selectedQuality?.label || active.preferredQualityLabel;
 
   const extractedQuality = selectedQuality?.label
-    ? playlistQualityPreferenceFromLabel(selectedQuality.label)
+    ? trackQualityPreferenceFromLabel(selectedQuality.label)
     : "";
 
-  const playlistQualityPreference =
-    extractedQuality || active.playlistQualityPreference;
+  const trackQualityPreference =
+    extractedQuality || active.trackQualityPreference;
 
-  appState.activePlaylistDownload = {
+  appState.activeTrackDownload = {
     ...active,
     outputFormat,
     segmentConcurrency,
-    ...(playlistQualityPreference ? { playlistQualityPreference } : {}),
+    ...(trackQualityPreference ? { trackQualityPreference } : {}),
     ...(preferredQualityLabel ? { preferredQualityLabel } : {}),
   };
 
-  if (!playlistDownloadId) return;
+  if (!trackDownloadId) return;
 
   chrome.runtime
     .sendMessage({
-      type: "update-playlist-download-preferences",
-      playlistDownloadId,
+      type: "update-track-download-preferences",
+      trackDownloadId,
       outputFormat,
       segmentConcurrency,
-      ...(playlistQualityPreference ? { playlistQualityPreference } : {}),
+      ...(trackQualityPreference ? { trackQualityPreference } : {}),
       ...(preferredQualityLabel ? { preferredQualityLabel } : {}),
     })
     .catch(() => {});
@@ -352,22 +349,19 @@ async function loadExistingDownloadsIndex(): Promise<Set<string>> {
 }
 
 function isAlreadyDownloadedFile(outputName: string): boolean {
-  if (!appState.playlistExistingDownloads?.size) return false;
+  if (!appState.trackExistingDownloads?.size) return false;
 
   const relativeTarget = downloadRelativePath(
     currentDownloadSubfolder(),
     outputName,
   );
 
-  return hasExistingDownload(
-    appState.playlistExistingDownloads,
-    relativeTarget,
-  );
+  return hasExistingDownload(appState.trackExistingDownloads, relativeTarget);
 }
 
 function recordDownloadedRelativePath(relativePath: string): void {
-  if (!appState.playlistExistingDownloads) return;
-  appState.playlistExistingDownloads.add(normalizeDownloadPath(relativePath));
+  if (!appState.trackExistingDownloads) return;
+  appState.trackExistingDownloads.add(normalizeDownloadPath(relativePath));
 }
 
 function setStatus(nextMessage: string, nextDetails = ""): void {
@@ -398,7 +392,7 @@ function setBusy(busy: boolean, downloadActive = false): void {
     busy,
     hasPlaylist: Boolean(appState.playlistAnalysis),
     downloadActive,
-    canResumePlaylist: hasResumablePlaylistPlan(),
+    canResumeTrack: hasResumableTrackPlan(),
   });
 
   analyzeButton.disabled = state.analyzeDisabled;
@@ -422,7 +416,7 @@ function updateOutputNote(): void {
 
 function currentDownloadSubfolder(): string {
   return downloadSubfolderOrDefault(
-    [appState.downloadSubfolder, ...appState.playlistFolderSegments]
+    [appState.downloadSubfolder, ...appState.trackFolderSegments]
       .filter(Boolean)
       .join("/"),
   );
@@ -486,7 +480,7 @@ const downloadSubfolderReady = restoreDownloadSubfolder().catch((error) =>
 
 sweepStaleOpfsJobs(appState.activeOpfsJobDir).catch(() => {});
 
-function isApiPlaylistSource(value: string): boolean {
+function isApiTrackSource(value: string): boolean {
   try {
     return /\/courses\//i.test(new URL(value).pathname);
   } catch {
@@ -555,7 +549,7 @@ async function fetchFromSourcePage(
   if (!Number.isSafeInteger(appState.sourceTabId)) return null;
 
   const canUseSourceTab =
-    isApiPlaylistSource(appState.sourcePageUrl) ||
+    isApiTrackSource(appState.sourcePageUrl) ||
     (allowSameOrigin && isSameOriginUrl(url, appState.sourcePageUrl));
 
   if (!canUseSourceTab) return null;
@@ -2070,18 +2064,18 @@ async function startDownload(): Promise<"completed" | "cancelled"> {
 }
 
 /** Chooses the HLS manifest for one requested video quality in a playlist item. */
-function preferredItemQuality(
-  item: PlaylistItemDownload,
+function preferredTopicQuality(
+  item: TrackTopicDownload,
   preference: string,
-  playlistQualityPreference = "best",
+  trackQualityPreference = "best",
 ): VideoQualityOption | null {
   const qualityOptions = item.qualityOptions || [];
 
-  if (playlistQualityPreference === "smallest") {
+  if (trackQualityPreference === "smallest") {
     return qualityOptions.at(-1) || null;
   }
 
-  const maximumHeight = Number(playlistQualityPreference);
+  const maximumHeight = Number(trackQualityPreference);
 
   if (Number.isFinite(maximumHeight) && maximumHeight > 0) {
     return (
@@ -2104,9 +2098,9 @@ function preferredItemQuality(
 }
 
 /** Applies the playlist-wide settings to one item before downloading it. */
-async function preparePlaylistItem(
-  item: PlaylistItemDownload,
-  playlistDownload: PlaylistDownloadPlan,
+async function prepareTrackTopic(
+  item: TrackTopicDownload,
+  trackDownload: TrackDownloadPlan,
 ): Promise<void> {
   // Earlier releases stored these two names. Read them only to keep a saved
   // quality choice while writing the current preferredQualityLabel key.
@@ -2121,14 +2115,14 @@ async function preparePlaylistItem(
   });
 
   const outputFormat = outputFormatOrDefault(
-    playlistDownload.outputFormat || DEFAULT_DOWNLOAD_PREFERENCES.outputFormat,
+    trackDownload.outputFormat || DEFAULT_DOWNLOAD_PREFERENCES.outputFormat,
   );
 
-  const itemSourceUrl = item.url || "";
+  const topicSourceUrl = item.url || "";
 
   const keepManualSelection =
-    Boolean(itemSourceUrl) &&
-    appState.userSelectedQualityForUrl === itemSourceUrl &&
+    Boolean(topicSourceUrl) &&
+    appState.userSelectedQualityForUrl === topicSourceUrl &&
     Boolean(appState.selectedQualityPlaylistUrl) &&
     Boolean(
       item.qualityOptions?.some(
@@ -2137,39 +2131,37 @@ async function preparePlaylistItem(
     );
 
   if (!keepManualSelection) {
-    const qualityOption = preferredItemQuality(
+    const qualityOption = preferredTopicQuality(
       item,
-      playlistDownload.preferredQualityLabel ||
+      trackDownload.preferredQualityLabel ||
         String(
           preferredQualityLabel ||
             legacyRenditionPreference ||
             legacyQualityPreference ||
             "",
         ),
-      playlistDownload.playlistQualityPreference,
+      trackDownload.trackQualityPreference,
     );
 
-    appState.selectedQualityPlaylistUrl = qualityOption?.url || itemSourceUrl;
+    appState.selectedQualityPlaylistUrl = qualityOption?.url || topicSourceUrl;
     appState.userSelectedQualityForUrl = "";
   }
 
   appState.selectedSubtitleTrack =
-    playlistDownload.subtitleDownloadPreference === "none"
+    trackDownload.subtitleDownloadPreference === "none"
       ? null
       : item.subtitles?.[0] || null;
 
-  appState.sourceTabId = playlistDownload.sourceTabId ?? null;
+  appState.sourceTabId = trackDownload.sourceTabId ?? null;
   appState.sourcePageUrl = item.sourceUrl || "";
-  appState.playlistFolderSegments = item.folderPath || [];
-  videoTitle.textContent = item.title || "Video item";
-  sourceHost.textContent = "Playlist item";
+  appState.trackFolderSegments = item.folderPath || [];
+  videoTitle.textContent = item.title || "Video topic";
+  sourceHost.textContent = "Track topic";
   container.value = outputFormat;
 
   concurrency.value = String(
     clampConcurrency(
-      Number(
-        playlistDownload.segmentConcurrency || DEFAULT_SEGMENT_CONCURRENCY,
-      ),
+      Number(trackDownload.segmentConcurrency || DEFAULT_SEGMENT_CONCURRENCY),
     ),
   );
 
@@ -2200,63 +2192,63 @@ async function preparePlaylistItem(
   await analyze();
 }
 
-async function recordCompletedPlaylistItem(
-  item: PlaylistItemDownload,
+async function recordCompletedTrackTopic(
+  item: TrackTopicDownload,
 ): Promise<void> {
-  if (typeof item.itemIndex !== "number") return;
+  if (typeof item.topicIndex !== "number") return;
 
-  appState.playlistCompletedIndices.add(item.itemIndex);
+  appState.trackCompletedIndices.add(item.topicIndex);
 
-  if (appState.activePlaylistDownload) {
-    appState.activePlaylistDownload = {
-      ...appState.activePlaylistDownload,
-      completedItemIndices: [...appState.playlistCompletedIndices],
+  if (appState.activeTrackDownload) {
+    appState.activeTrackDownload = {
+      ...appState.activeTrackDownload,
+      completedTopicIndices: [...appState.trackCompletedIndices],
     };
   }
 
-  if (!playlistDownloadId) return;
+  if (!trackDownloadId) return;
 
   await chrome.runtime
     .sendMessage({
-      type: "complete-playlist-download-item",
-      playlistDownloadId,
-      itemIndex: item.itemIndex,
+      type: "complete-track-download-topic",
+      trackDownloadId,
+      topicIndex: item.topicIndex,
     })
     .catch(() => {});
 }
 
-function isItemAlreadyCompleted(
-  item: PlaylistItemDownload,
+function isTopicAlreadyCompleted(
+  item: TrackTopicDownload,
   completedSet: ReadonlySet<number>,
 ): boolean {
-  return typeof item.itemIndex === "number" && completedSet.has(item.itemIndex);
+  return (
+    typeof item.topicIndex === "number" && completedSet.has(item.topicIndex)
+  );
 }
 
-type PlaylistItemFailureKind = RemuxErrorKind;
+type TrackTopicFailureKind = RemuxErrorKind;
 
-type PlaylistItemAttempt =
+type TrackTopicAttempt =
   | { readonly status: "completed"; readonly skippedExisting?: boolean }
   | { readonly status: "cancelled" }
   | {
       readonly status: "failed";
-      readonly kind: PlaylistItemFailureKind;
+      readonly kind: TrackTopicFailureKind;
       readonly message: string;
     };
 
 /** Context required to process one ordered item in a playlist queue. */
-interface PlaylistQueueItemContext {
+interface TrackQueueTopicContext {
   readonly index: number;
-  readonly item: PlaylistItemDownload;
-  readonly totalItems: number;
-  readonly initialPlan: PlaylistDownloadPlan;
-  readonly queueState: PlaylistQueueState;
+  readonly item: TrackTopicDownload;
+  readonly totalTopics: number;
+  readonly initialPlan: TrackDownloadPlan;
+  readonly queueState: TrackQueueState;
   readonly runStats: { downloaded: number; skippedExisting: number };
   readonly failures: string[];
 }
 
-function classifyPlaylistItemFailure(
-  errorText: string,
-): PlaylistItemFailureKind {
+function classifyTrackTopicFailure(errorText: string): TrackTopicFailureKind {
   return classifyRemuxErrorKind(errorText);
 }
 
@@ -2302,11 +2294,11 @@ interface DownloadedDocumentRecord {
 }
 
 interface DocumentBatchContext {
-  readonly itemTitle: string;
+  readonly topicTitle: string;
   readonly signal: AbortSignal;
   readonly usedFilenames: Set<string>;
   readonly downloadedDocumentsByKey: Map<string, DownloadedDocumentRecord>;
-  readonly itemArtifacts: DownloadedArtifactAnnotation[];
+  readonly topicArtifacts: DownloadedArtifactAnnotation[];
   readonly currentFolderPath: readonly string[];
   readonly warnings: string[];
   readonly onStepDone?: () => void;
@@ -2335,7 +2327,7 @@ function imageMimeType(extension: string): string {
 }
 
 function isValidDocumentPayload(
-  kind: ItemFileAsset["kind"],
+  kind: TopicFileAsset["kind"],
   bytes: Uint8Array,
   contentType: string,
 ): boolean {
@@ -2380,7 +2372,7 @@ async function fetchWithCredentialFallback(
 
 async function fetchSingleDocumentCandidate(
   candidateUrl: string,
-  kind: ItemFileAsset["kind"],
+  kind: TopicFileAsset["kind"],
   fallbackContentType: string,
   signal: AbortSignal,
 ): Promise<{ readonly bytes: Uint8Array; readonly contentType: string }> {
@@ -2415,7 +2407,7 @@ async function fetchSingleDocumentCandidate(
 }
 
 async function fetchDocumentFile(
-  asset: ItemFileAsset,
+  asset: TopicFileAsset,
   signal: AbortSignal,
 ): Promise<{ readonly bytes: Uint8Array; readonly contentType: string }> {
   const candidates = [asset.url, asset.fallbackUrl].filter(
@@ -2485,7 +2477,7 @@ function uniqueDocumentFilename(
 }
 
 function fileAssetFallbackStem(
-  kind: ItemFileAsset["kind"],
+  kind: TopicFileAsset["kind"],
   index: number,
 ): string {
   if (kind !== "pdf") return `Image ${index + 1}`;
@@ -2558,7 +2550,7 @@ function recordSavedDocument(
     status: "downloaded",
   });
 
-  context.itemArtifacts.push({
+  context.topicArtifacts.push({
     kind,
     url,
     ...(fallbackUrl ? { fallbackUrl } : {}),
@@ -2615,7 +2607,7 @@ function tryReuseDownloadedDocument(
       context.currentFolderPath,
     );
 
-    context.itemArtifacts.push({
+    context.topicArtifacts.push({
       kind,
       url,
       ...(fallbackUrl ? { fallbackUrl } : {}),
@@ -2717,18 +2709,18 @@ async function exportViaHiddenFrame<T>(options: {
 }
 
 function existingDocumentFilenameOnDisk(
-  asset: ItemFileAsset,
-  itemTitle: string,
+  asset: TopicFileAsset,
+  topicTitle: string,
   fallbackStem: string,
   usedFilenames: ReadonlySet<string>,
 ): string | null {
-  const existingDownloads = appState.playlistExistingDownloads;
+  const existingDownloads = appState.trackExistingDownloads;
 
   if (!existingDownloads?.size) return null;
 
   if (asset.kind === "pdf") {
     const pdfCandidate = peekUniqueDocumentFilename(
-      prefixedDocumentFilename(itemTitle, asset.filename, "pdf", fallbackStem),
+      prefixedDocumentFilename(topicTitle, asset.filename, "pdf", fallbackStem),
       usedFilenames,
     );
 
@@ -2755,7 +2747,7 @@ function existingDocumentFilenameOnDisk(
     currentDownloadSubfolder(),
     (ext) =>
       peekUniqueDocumentFilename(
-        prefixedDocumentFilename(itemTitle, asset.filename, ext, fallbackStem),
+        prefixedDocumentFilename(topicTitle, asset.filename, ext, fallbackStem),
         usedFilenames,
       ),
     extensions,
@@ -2763,7 +2755,7 @@ function existingDocumentFilenameOnDisk(
 }
 
 async function downloadDocumentFiles(
-  assets: readonly ItemFileAsset[],
+  assets: readonly TopicFileAsset[],
   context: DocumentBatchContext,
 ): Promise<number> {
   const counter = { saved: 0 };
@@ -2784,7 +2776,7 @@ async function downloadDocumentFiles(
 
     const existingOnDisk = existingDocumentFilenameOnDisk(
       asset,
-      context.itemTitle,
+      context.topicTitle,
       fallbackStem,
       context.usedFilenames,
     );
@@ -2822,7 +2814,7 @@ async function downloadDocumentFiles(
 
         const targetName = uniqueDocumentFilename(
           prefixedDocumentFilename(
-            context.itemTitle,
+            context.topicTitle,
             asset.filename,
             ext,
             fallbackStem,
@@ -2851,7 +2843,7 @@ async function downloadDocumentFiles(
 }
 
 async function exportLinkPayload(
-  link: ItemLinkAsset,
+  link: TopicLinkAsset,
   signal: AbortSignal,
 ): Promise<{
   readonly contents: Uint8Array | string;
@@ -2908,7 +2900,7 @@ async function exportLinkPayload(
 }
 
 async function downloadDocumentLinks(
-  links: readonly ItemLinkAsset[],
+  links: readonly TopicLinkAsset[],
   context: DocumentBatchContext,
 ): Promise<number> {
   const counter = { saved: 0 };
@@ -2930,7 +2922,7 @@ async function downloadDocumentLinks(
 
     const plannedName = peekUniqueDocumentFilename(
       prefixedDocumentFilename(
-        context.itemTitle,
+        context.topicTitle,
         link.title,
         ext,
         fallbackStem,
@@ -2964,7 +2956,7 @@ async function downloadDocumentLinks(
 
         const targetName = uniqueDocumentFilename(
           prefixedDocumentFilename(
-            context.itemTitle,
+            context.topicTitle,
             link.title,
             exported.extension,
             fallbackStem,
@@ -2991,7 +2983,7 @@ async function downloadDocumentLinks(
 }
 
 async function downloadDocumentNotes(
-  notes: readonly ItemMarkdownNote[],
+  notes: readonly TopicMarkdownNote[],
   context: DocumentBatchContext,
   baseArtifacts: readonly DownloadedArtifactAnnotation[],
 ): Promise<number> {
@@ -3008,7 +3000,7 @@ async function downloadDocumentNotes(
 
     if (lookup?.reused) continue;
 
-    const repairedNote = cleanItemMarkdown(
+    const repairedNote = cleanTopicMarkdown(
       repairDoubleEncodedUtf8(note.markdown),
     );
 
@@ -3016,7 +3008,7 @@ async function downloadDocumentNotes(
 
     const plannedName = peekUniqueDocumentFilename(
       prefixedDocumentFilename(
-        context.itemTitle,
+        context.topicTitle,
         note.title,
         "md",
         `Note ${index + 1}`,
@@ -3054,7 +3046,7 @@ async function downloadDocumentNotes(
       async () => {
         const targetName = uniqueDocumentFilename(
           prefixedDocumentFilename(
-            context.itemTitle,
+            context.topicTitle,
             note.title,
             "md",
             `Note ${index + 1}`,
@@ -3088,17 +3080,19 @@ async function downloadDocumentNotes(
   return counter.saved;
 }
 
-async function saveMainItemMarkdown(
-  itemTitle: string,
+async function saveMainTopicMarkdown(
+  topicTitle: string,
   markdown: string,
   context: DocumentBatchContext,
 ): Promise<number> {
-  const repairedMarkdown = cleanItemMarkdown(repairDoubleEncodedUtf8(markdown));
+  const repairedMarkdown = cleanTopicMarkdown(
+    repairDoubleEncodedUtf8(markdown),
+  );
 
   if (!repairedMarkdown.trim()) return 0;
 
   const plannedNoteName = peekUniqueDocumentFilename(
-    prefixedDocumentFilename(itemTitle, itemTitle, "md"),
+    prefixedDocumentFilename(topicTitle, topicTitle, "md"),
     context.usedFilenames,
   );
 
@@ -3111,13 +3105,13 @@ async function saveMainItemMarkdown(
 
   const annotatedMarkdown = annotateMarkdownWithDownloadedArtifacts(
     repairedMarkdown,
-    context.itemArtifacts,
+    context.topicArtifacts,
     canonicalDocumentUrlKey,
   );
 
   return runOptionalDocumentStep("Page notes", context, async () => {
     const targetName = uniqueDocumentFilename(
-      prefixedDocumentFilename(itemTitle, itemTitle, "md"),
+      prefixedDocumentFilename(topicTitle, topicTitle, "md"),
       context.usedFilenames,
     );
 
@@ -3129,30 +3123,30 @@ async function saveMainItemMarkdown(
   });
 }
 
-async function downloadItemCompanionDocuments(
-  itemTitle: string,
-  documents: ItemCompanionDocuments | undefined,
+async function downloadTopicCompanionDocuments(
+  topicTitle: string,
+  documents: TopicCompanionDocuments | undefined,
   signal: AbortSignal,
   options?: {
     readonly onStepDone?: () => void;
     readonly downloadedDocumentsByKey?: Map<string, DownloadedDocumentRecord>;
     readonly currentFolderPath?: readonly string[];
-    readonly savedVideos?: readonly SavedItemVideoArtifact[];
+    readonly savedVideos?: readonly SavedTopicVideoArtifact[];
   },
 ): Promise<number> {
-  if (!documents || !countItemCompanionDocuments(documents)) return 0;
+  if (!documents || !countTopicCompanionDocuments(documents)) return 0;
 
   const usedFilenames = new Set<string>();
   const warnings: string[] = [];
 
   const context: DocumentBatchContext = {
-    itemTitle,
+    topicTitle,
     signal,
     usedFilenames,
     downloadedDocumentsByKey:
       options?.downloadedDocumentsByKey ??
       new Map<string, DownloadedDocumentRecord>(),
-    itemArtifacts: [],
+    topicArtifacts: [],
     currentFolderPath: options?.currentFolderPath ?? [],
     warnings,
     onStepDone: options?.onStepDone,
@@ -3162,7 +3156,7 @@ async function downloadItemCompanionDocuments(
 
   for (const savedVideo of options?.savedVideos ?? []) {
     if (savedVideo.sourceUrl && savedVideo.filename) {
-      context.itemArtifacts.push({
+      context.topicArtifacts.push({
         kind: "video",
         url: savedVideo.sourceUrl,
         filename: savedVideo.filename,
@@ -3175,7 +3169,7 @@ async function downloadItemCompanionDocuments(
   counts.saved += await downloadDocumentLinks(documents.diagrams, context);
   counts.saved += await downloadDocumentLinks(documents.slides, context);
 
-  const fileAndLinkArtifacts = context.itemArtifacts.filter(
+  const fileAndLinkArtifacts = context.topicArtifacts.filter(
     (artifact) => artifact.kind !== "video",
   );
 
@@ -3185,8 +3179,8 @@ async function downloadItemCompanionDocuments(
     fileAndLinkArtifacts,
   );
 
-  counts.saved += await saveMainItemMarkdown(
-    itemTitle,
+  counts.saved += await saveMainTopicMarkdown(
+    topicTitle,
     documents.markdown,
     context,
   );
@@ -3201,10 +3195,10 @@ async function downloadItemCompanionDocuments(
 }
 
 async function runDocumentsDownloadPhase(
-  item: PlaylistItemDownload,
+  item: TrackTopicDownload,
   documentsOnly: boolean,
   downloadedDocumentsByKey: Map<string, DownloadedDocumentRecord>,
-  savedVideos: readonly SavedItemVideoArtifact[] = [],
+  savedVideos: readonly SavedTopicVideoArtifact[] = [],
 ): Promise<{
   readonly outcome: "completed" | "cancelled";
   readonly savedCount: number;
@@ -3216,21 +3210,21 @@ async function runDocumentsDownloadPhase(
 
   return withDownloadTabKeepAlive(async () => {
     try {
-      const itemTitle = item.title || "Item";
+      const topicTitle = item.title || "Topic";
 
       if (documentsOnly) {
         const totalSteps = Math.max(
-          countItemCompanionDocuments(item.documents),
+          countTopicCompanionDocuments(item.documents),
           1,
         );
 
-        setStatus("Downloading companion documents…", itemTitle);
+        setStatus("Downloading companion documents…", topicTitle);
         progress.max = totalSteps;
         progress.value = 0;
       }
 
-      const savedCount = await downloadItemCompanionDocuments(
-        itemTitle,
+      const savedCount = await downloadTopicCompanionDocuments(
+        topicTitle,
         item.documents,
         controller.signal,
         {
@@ -3247,7 +3241,7 @@ async function runDocumentsDownloadPhase(
         },
       );
 
-      if (appState.playlistDownloadCancelled || controller.signal.aborted) {
+      if (appState.trackDownloadCancelled || controller.signal.aborted) {
         return { outcome: "cancelled", savedCount: 0 };
       }
 
@@ -3266,7 +3260,7 @@ async function runDocumentsDownloadPhase(
 
       return { outcome: "completed", savedCount };
     } catch (error) {
-      if (appState.playlistDownloadCancelled || isAbortError(error)) {
+      if (appState.trackDownloadCancelled || isAbortError(error)) {
         setStatus(
           "Download cancelled",
           "Remaining companion documents were skipped.",
@@ -3283,14 +3277,14 @@ async function runDocumentsDownloadPhase(
   });
 }
 
-async function downloadStandalonePlaylistSubtitle(
-  item: PlaylistItemDownload,
-  playlistDownload: PlaylistDownloadPlan,
+async function downloadStandaloneTrackSubtitle(
+  item: TrackTopicDownload,
+  trackDownload: TrackDownloadPlan,
 ): Promise<{
   readonly outcome: "completed" | "cancelled";
   readonly saved: boolean;
 }> {
-  if (playlistDownload.subtitleDownloadPreference === "none") {
+  if (trackDownload.subtitleDownloadPreference === "none") {
     return { outcome: "completed", saved: false };
   }
 
@@ -3298,9 +3292,9 @@ async function downloadStandalonePlaylistSubtitle(
 
   if (!track?.url) return { outcome: "completed", saved: false };
 
-  const itemTitle = item.title || "video";
+  const topicTitle = item.title || "video";
 
-  const targetName = subtitleFilename(videoFilename(itemTitle), track.url);
+  const targetName = subtitleFilename(videoFilename(topicTitle), track.url);
 
   if (isAlreadyDownloadedFile(targetName)) {
     return { outcome: "completed", saved: false };
@@ -3315,12 +3309,12 @@ async function downloadStandalonePlaylistSubtitle(
     try {
       setStatus(
         "Downloading subtitle…",
-        `${itemTitle} (${track.language || "Subtitle"})`,
+        `${topicTitle} (${track.language || "Subtitle"})`,
       );
 
       const text = await subtitleText(track, controller.signal);
 
-      if (appState.playlistDownloadCancelled || controller.signal.aborted) {
+      if (appState.trackDownloadCancelled || controller.signal.aborted) {
         return { outcome: "cancelled", saved: false };
       }
 
@@ -3333,11 +3327,8 @@ async function downloadStandalonePlaylistSubtitle(
 
       return { outcome: "completed", saved: true };
     } catch (error) {
-      if (appState.playlistDownloadCancelled || isAbortError(error)) {
-        setStatus(
-          "Download cancelled",
-          "Remaining playlist items were skipped.",
-        );
+      if (appState.trackDownloadCancelled || isAbortError(error)) {
+        setStatus("Download cancelled", "Remaining track topics were skipped.");
 
         return { outcome: "cancelled", saved: false };
       }
@@ -3350,17 +3341,17 @@ async function downloadStandalonePlaylistSubtitle(
   });
 }
 
-async function runNonVideoPlaylistItem(
-  item: PlaylistItemDownload,
-  playlistDownload: PlaylistDownloadPlan,
-  mode: PlaylistDownloadMode,
+async function runNonVideoTrackTopic(
+  item: TrackTopicDownload,
+  trackDownload: TrackDownloadPlan,
+  mode: TrackDownloadMode,
   downloadedDocumentsByKey: Map<string, DownloadedDocumentRecord>,
-): Promise<PlaylistItemAttempt> {
-  appState.playlistFolderSegments = item.folderPath || [];
-  appState.sourceTabId = playlistDownload.sourceTabId ?? null;
+): Promise<TrackTopicAttempt> {
+  appState.trackFolderSegments = item.folderPath || [];
+  appState.sourceTabId = trackDownload.sourceTabId ?? null;
   appState.sourcePageUrl = item.sourceUrl || "";
   videoTitle.textContent = item.title || "Companion documents";
-  sourceHost.textContent = "Playlist item";
+  sourceHost.textContent = "Track topic";
 
   formatNote.textContent =
     "Subtitles, Markdown, images, PDFs, diagrams, and slides";
@@ -3373,26 +3364,23 @@ async function runNonVideoPlaylistItem(
   if (
     mode !== "documents" &&
     item.subtitles?.length &&
-    playlistDownload.subtitleDownloadPreference !== "none"
+    trackDownload.subtitleDownloadPreference !== "none"
   ) {
     activity.hadContent = true;
 
-    const subResult = await downloadStandalonePlaylistSubtitle(
+    const subResult = await downloadStandaloneTrackSubtitle(
       item,
-      playlistDownload,
+      trackDownload,
     );
 
-    if (
-      subResult.outcome === "cancelled" ||
-      appState.playlistDownloadCancelled
-    ) {
+    if (subResult.outcome === "cancelled" || appState.trackDownloadCancelled) {
       return Object.freeze({ status: "cancelled" });
     }
 
     if (subResult.saved) activity.downloadedAny = true;
   }
 
-  if (mode !== "videos" && countItemCompanionDocuments(item.documents) > 0) {
+  if (mode !== "videos" && countTopicCompanionDocuments(item.documents) > 0) {
     activity.hadContent = true;
 
     const documentsResult = await runDocumentsDownloadPhase(
@@ -3403,7 +3391,7 @@ async function runNonVideoPlaylistItem(
 
     if (
       documentsResult.outcome === "cancelled" ||
-      appState.playlistDownloadCancelled
+      appState.trackDownloadCancelled
     ) {
       return Object.freeze({ status: "cancelled" });
     }
@@ -3411,7 +3399,7 @@ async function runNonVideoPlaylistItem(
     if (documentsResult.savedCount > 0) activity.downloadedAny = true;
   }
 
-  await recordCompletedPlaylistItem(item);
+  await recordCompletedTrackTopic(item);
 
   return Object.freeze({
     status: "completed",
@@ -3455,7 +3443,7 @@ async function downloadDirectSubtitleSidecar(
 
     return true;
   } catch (subError) {
-    if (appState.playlistDownloadCancelled || isAbortError(subError)) {
+    if (appState.trackDownloadCancelled || isAbortError(subError)) {
       throw subError;
     }
 
@@ -3465,9 +3453,9 @@ async function downloadDirectSubtitleSidecar(
   }
 }
 
-async function downloadDirectPlaylistVideo(
-  item: PlaylistItemDownload,
-  playlistDownload: PlaylistDownloadPlan,
+async function downloadDirectTrackVideo(
+  item: TrackTopicDownload,
+  trackDownload: TrackDownloadPlan,
 ): Promise<{
   readonly outcome: "completed" | "cancelled";
   readonly savedFilename: string;
@@ -3477,11 +3465,11 @@ async function downloadDirectPlaylistVideo(
 
   if (!safeUrl) throw new Error("Unsafe direct video URL.");
 
-  const itemTitle = item.title || "video";
-  const savedFilename = directVideoFilename(itemTitle, safeUrl);
+  const topicTitle = item.title || "video";
+  const savedFilename = directVideoFilename(topicTitle, safeUrl);
 
-  appState.playlistFolderSegments = item.folderPath || [];
-  appState.sourceTabId = playlistDownload.sourceTabId ?? null;
+  appState.trackFolderSegments = item.folderPath || [];
+  appState.sourceTabId = trackDownload.sourceTabId ?? null;
   appState.sourcePageUrl = item.sourceUrl || "";
 
   const targetFilename = downloadRelativePath(
@@ -3490,11 +3478,11 @@ async function downloadDirectPlaylistVideo(
   );
 
   const track =
-    playlistDownload.subtitleDownloadPreference === "none"
+    trackDownload.subtitleDownloadPreference === "none"
       ? null
       : item.subtitles?.[0] || null;
 
-  videoTitle.textContent = itemTitle;
+  videoTitle.textContent = topicTitle;
   sourceHost.textContent = "Direct video";
   filename.value = savedFilename;
   playlistUrl.value = safeUrl;
@@ -3527,7 +3515,7 @@ async function downloadDirectPlaylistVideo(
         recordDownloadedRelativePath(targetFilename);
       }
 
-      if (appState.playlistDownloadCancelled || controller.signal.aborted) {
+      if (appState.trackDownloadCancelled || controller.signal.aborted) {
         return Object.freeze({
           outcome: "cancelled" as const,
           savedFilename,
@@ -3556,7 +3544,7 @@ async function downloadDirectPlaylistVideo(
         skipped: videoExistsOnDisk && !savedSub,
       });
     } catch (error) {
-      if (appState.playlistDownloadCancelled || isAbortError(error)) {
+      if (appState.trackDownloadCancelled || isAbortError(error)) {
         setStatus("Download cancelled", "The video download was cancelled.");
 
         return Object.freeze({
@@ -3574,15 +3562,15 @@ async function downloadDirectPlaylistVideo(
   });
 }
 
-async function downloadMissingPlaylistVideoSubtitle(
-  videoEntry: PlaylistItemDownload,
-  playlistDownload: PlaylistDownloadPlan,
+async function downloadMissingTrackVideoSubtitle(
+  videoEntry: TrackTopicDownload,
+  trackDownload: TrackDownloadPlan,
   savedFilename: string,
 ): Promise<{
   readonly outcome: "completed" | "cancelled";
   readonly saved: boolean;
 }> {
-  if (playlistDownload.subtitleDownloadPreference === "none") {
+  if (trackDownload.subtitleDownloadPreference === "none") {
     return { outcome: "completed", saved: false };
   }
 
@@ -3605,7 +3593,7 @@ async function downloadMissingPlaylistVideoSubtitle(
     try {
       const contents = await subtitleText(track, controller.signal);
 
-      if (appState.playlistDownloadCancelled || controller.signal.aborted) {
+      if (appState.trackDownloadCancelled || controller.signal.aborted) {
         return { outcome: "cancelled", saved: false };
       }
 
@@ -3613,7 +3601,7 @@ async function downloadMissingPlaylistVideoSubtitle(
 
       return { outcome: "completed", saved: true };
     } catch (error) {
-      if (appState.playlistDownloadCancelled || isAbortError(error)) {
+      if (appState.trackDownloadCancelled || isAbortError(error)) {
         return { outcome: "cancelled", saved: false };
       }
 
@@ -3627,20 +3615,20 @@ async function downloadMissingPlaylistVideoSubtitle(
   });
 }
 
-async function runHlsPlaylistVideo(
-  videoEntry: PlaylistItemDownload,
-  playlistDownload: PlaylistDownloadPlan,
+async function runHlsTrackVideo(
+  videoEntry: TrackTopicDownload,
+  trackDownload: TrackDownloadPlan,
 ): Promise<{
   readonly outcome: "completed" | "cancelled";
   readonly savedFilename: string;
   readonly skipped: boolean;
 }> {
-  appState.playlistFolderSegments = videoEntry.folderPath || [];
-  appState.sourceTabId = playlistDownload.sourceTabId ?? null;
+  appState.trackFolderSegments = videoEntry.folderPath || [];
+  appState.sourceTabId = trackDownload.sourceTabId ?? null;
   appState.sourcePageUrl = videoEntry.sourceUrl || "";
 
   const plannedOutputFormat = outputFormatOrDefault(
-    playlistDownload.outputFormat || container.value,
+    trackDownload.outputFormat || container.value,
   );
 
   const plannedFilename = mediaFilename(
@@ -3656,17 +3644,14 @@ async function runHlsPlaylistVideo(
 
     const subResult =
       plannedOutputFormat === "mp4"
-        ? await downloadMissingPlaylistVideoSubtitle(
+        ? await downloadMissingTrackVideoSubtitle(
             videoEntry,
-            playlistDownload,
+            trackDownload,
             plannedFilename,
           )
         : { outcome: "completed" as const, saved: false };
 
-    if (
-      subResult.outcome === "cancelled" ||
-      appState.playlistDownloadCancelled
-    ) {
+    if (subResult.outcome === "cancelled" || appState.trackDownloadCancelled) {
       return Object.freeze({
         outcome: "cancelled" as const,
         savedFilename: plannedFilename,
@@ -3681,7 +3666,7 @@ async function runHlsPlaylistVideo(
     });
   }
 
-  await preparePlaylistItem(videoEntry, playlistDownload);
+  await prepareTrackTopic(videoEntry, trackDownload);
 
   const savedFilename = mediaFilename(
     filename.value,
@@ -3693,15 +3678,15 @@ async function runHlsPlaylistVideo(
   return Object.freeze({ outcome, savedFilename, skipped: false });
 }
 
-function itemVideoEntries(
-  item: PlaylistItemDownload,
-): readonly PlaylistItemDownload[] {
+function topicVideoEntries(
+  item: TrackTopicDownload,
+): readonly TrackTopicDownload[] {
   const primaryTitle = item.primaryVideoTitle || item.title;
 
   return [
     { ...item, title: primaryTitle },
     ...(item.extraVideos || []).map((extra) => ({
-      itemIndex: item.itemIndex,
+      topicIndex: item.topicIndex,
       url: extra.url,
       title: extra.title,
       sourceUrl: extra.sourceUrl || item.sourceUrl,
@@ -3713,24 +3698,24 @@ function itemVideoEntries(
   ];
 }
 
-async function runPlaylistItemVideos(
-  item: PlaylistItemDownload,
-  initialPlan: PlaylistDownloadPlan,
-  savedVideos: SavedItemVideoArtifact[],
+async function runTrackTopicVideos(
+  item: TrackTopicDownload,
+  initialPlan: TrackDownloadPlan,
+  savedVideos: SavedTopicVideoArtifact[],
   activity: { hadContent: boolean; downloadedAny: boolean },
 ): Promise<boolean> {
-  for (const videoEntry of itemVideoEntries(item)) {
+  for (const videoEntry of topicVideoEntries(item)) {
     activity.hadContent = true;
-    const currentPlan = appState.activePlaylistDownload ?? initialPlan;
+    const currentPlan = appState.activeTrackDownload ?? initialPlan;
 
     const isDirect =
       videoEntry.kind === "direct" || isDirectVideoUrl(videoEntry.url || "");
 
     const { outcome, savedFilename, skipped } = isDirect
-      ? await downloadDirectPlaylistVideo(videoEntry, currentPlan)
-      : await runHlsPlaylistVideo(videoEntry, currentPlan);
+      ? await downloadDirectTrackVideo(videoEntry, currentPlan)
+      : await runHlsTrackVideo(videoEntry, currentPlan);
 
-    if (outcome === "cancelled" || appState.playlistDownloadCancelled) {
+    if (outcome === "cancelled" || appState.trackDownloadCancelled) {
       return false;
     }
 
@@ -3747,20 +3732,20 @@ async function runPlaylistItemVideos(
   return true;
 }
 
-async function runSinglePlaylistItem(
-  item: PlaylistItemDownload,
-  playlistDownload: PlaylistDownloadPlan,
+async function runSingleTrackTopic(
+  item: TrackTopicDownload,
+  trackDownload: TrackDownloadPlan,
   downloadedDocumentsByKey: Map<string, DownloadedDocumentRecord>,
-): Promise<PlaylistItemAttempt> {
+): Promise<TrackTopicAttempt> {
   try {
-    const activePlan = appState.activePlaylistDownload ?? playlistDownload;
-    const mode = playlistDownloadModeOrDefault(activePlan.playlistDownloadMode);
+    const activePlan = appState.activeTrackDownload ?? trackDownload;
+    const mode = trackDownloadModeOrDefault(activePlan.trackDownloadMode);
 
     const videoAvailable =
       Boolean(item.url?.trim()) || Boolean(item.qualityOptions?.length);
 
     if (mode === "documents" || !videoAvailable) {
-      return await runNonVideoPlaylistItem(
+      return await runNonVideoTrackTopic(
         item,
         activePlan,
         mode,
@@ -3768,10 +3753,10 @@ async function runSinglePlaylistItem(
       );
     }
 
-    const savedVideos: SavedItemVideoArtifact[] = [];
+    const savedVideos: SavedTopicVideoArtifact[] = [];
     const activity = { hadContent: false, downloadedAny: false };
 
-    const videosOk = await runPlaylistItemVideos(
+    const videosOk = await runTrackTopicVideos(
       item,
       activePlan,
       savedVideos,
@@ -3780,15 +3765,15 @@ async function runSinglePlaylistItem(
 
     if (!videosOk) return Object.freeze({ status: "cancelled" });
 
-    const planAfterVideos = appState.activePlaylistDownload ?? activePlan;
+    const planAfterVideos = appState.activeTrackDownload ?? activePlan;
 
-    const latestMode = playlistDownloadModeOrDefault(
-      planAfterVideos.playlistDownloadMode,
+    const latestMode = trackDownloadModeOrDefault(
+      planAfterVideos.trackDownloadMode,
     );
 
     if (
       latestMode === "all" &&
-      countItemCompanionDocuments(item.documents) > 0
+      countTopicCompanionDocuments(item.documents) > 0
     ) {
       activity.hadContent = true;
 
@@ -3801,7 +3786,7 @@ async function runSinglePlaylistItem(
 
       if (
         documentResult.outcome === "cancelled" ||
-        appState.playlistDownloadCancelled
+        appState.trackDownloadCancelled
       ) {
         return Object.freeze({ status: "cancelled" });
       }
@@ -3809,124 +3794,124 @@ async function runSinglePlaylistItem(
       if (documentResult.savedCount > 0) activity.downloadedAny = true;
     }
 
-    await recordCompletedPlaylistItem(item);
+    await recordCompletedTrackTopic(item);
 
     return Object.freeze({
       status: "completed",
       skippedExisting: activity.hadContent && !activity.downloadedAny,
     });
   } catch (error) {
-    if (appState.playlistDownloadCancelled || isAbortError(error)) {
+    if (appState.trackDownloadCancelled || isAbortError(error)) {
       return Object.freeze({ status: "cancelled" });
     }
 
-    console.error("OPFS Media Packager playlist item", error);
+    console.error("OPFS Media Packager track topic", error);
     const errorText = errorMessageOf(error);
 
     return Object.freeze({
       status: "failed",
-      kind: classifyPlaylistItemFailure(errorText),
+      kind: classifyTrackTopicFailure(errorText),
       message: errorText,
     });
   }
 }
 
-function completedPlaylistDetails(
-  totalItems: number,
-  itemWord: string,
-  mode: PlaylistDownloadMode,
+function completedTrackDetails(
+  totalTopics: number,
+  topicWord: string,
+  mode: TrackDownloadMode,
   runStats: { readonly downloaded: number; readonly skippedExisting: number },
 ): string {
   if (runStats.skippedExisting > 0 && runStats.downloaded === 0) {
-    return `All ${totalItems} ${itemWord} already existed in the selected playlist folders.`;
+    return `All ${totalTopics} ${topicWord} already existed in the selected track folders.`;
   }
 
   if (runStats.skippedExisting > 0) {
-    return `${runStats.downloaded} downloaded, ${runStats.skippedExisting} already existed in the selected playlist folders.`;
+    return `${runStats.downloaded} downloaded, ${runStats.skippedExisting} already existed in the selected track folders.`;
   }
 
   if (mode === "documents") {
-    return `Companion documents from ${totalItems} ${itemWord} saved in the selected playlist folders.`;
+    return `Companion documents from ${totalTopics} ${topicWord} saved in the selected track folders.`;
   }
 
   if (mode === "all") {
-    return `${totalItems} ${itemWord} saved in the selected playlist folders.`;
+    return `${totalTopics} ${topicWord} saved in the selected track folders.`;
   }
 
-  return `${totalItems} videos saved in the selected playlist folders.`;
+  return `${totalTopics} videos saved in the selected track folders.`;
 }
 
-function finalizePlaylistQueueStatus(
-  totalItems: number,
+function finalizeTrackQueueStatus(
+  totalTopics: number,
   failures: readonly string[],
-  haltedKind: PlaylistItemFailureKind | null,
-  mode: PlaylistDownloadMode = DEFAULT_DOWNLOAD_PREFERENCES.playlistDownloadMode,
+  haltedKind: TrackTopicFailureKind | null,
+  mode: TrackDownloadMode = DEFAULT_DOWNLOAD_PREFERENCES.trackDownloadMode,
   runStats: {
     readonly downloaded: number;
     readonly skippedExisting: number;
   } = {
-    downloaded: totalItems,
+    downloaded: totalTopics,
     skippedExisting: 0,
   },
 ): void {
   const documentsOnly = mode === "documents";
-  const scope = documentsOnly ? "Playlist documents" : "Playlist download";
-  const itemWord = totalItems === 1 ? "item" : "items";
+  const scope = documentsOnly ? "Track documents" : "Track download";
+  const topicWord = totalTopics === 1 ? "topic" : "topics";
 
-  if (appState.playlistDownloadCancelled) {
-    const target = documentsOnly ? "companion documents" : "items";
+  if (appState.trackDownloadCancelled) {
+    const target = documentsOnly ? "companion documents" : "topics";
 
     setStatus(
       `${scope} cancelled`,
-      `Completed ${target} remain in their playlist folders.`,
+      `Completed ${target} remain in their track folders.`,
     );
 
-    playlistDownloadNote.textContent = `${scope} queue cancelled. Adjust settings and click Resume playlist to continue.`;
+    trackDownloadNote.textContent = `${scope} queue cancelled. Adjust settings and click Resume track to continue.`;
 
     return;
   }
 
   if (haltedKind === "rate-limited") {
     setStatus(
-      "Playlist download paused — rate limit reached",
-      "The media server temporarily rate-limited requests. Completed items were kept; reload this tab or click Resume playlist after a few minutes.",
+      "Track download paused — rate limit reached",
+      "The media server temporarily rate-limited requests. Completed topics were kept; reload this tab or click Resume track after a few minutes.",
     );
 
-    playlistDownloadNote.textContent =
-      "Playlist queue paused on HTTP 429/503; completed items were kept.";
+    trackDownloadNote.textContent =
+      "Track queue paused on HTTP 429/503; completed topics were kept.";
 
     return;
   }
 
   if (haltedKind === "unauthorized") {
     setStatus(
-      "Playlist download paused: access denied",
-      "Sign in again and refresh the source page, then select Resume playlist. Completed items are kept.",
+      "Track download paused: access denied",
+      "Sign in again and refresh the source page, then select Resume track. Completed topics are kept.",
     );
 
-    playlistDownloadNote.textContent =
-      "The server denied access to two items. Refresh your session before resuming.";
+    trackDownloadNote.textContent =
+      "The server denied access to two topics. Refresh your session before resuming.";
 
     return;
   }
 
   if (failures.length) {
-    const failedWord = failures.length === 1 ? "item" : "items";
-    const unit = documentsOnly ? "items had documents" : "videos were";
+    const failedWord = failures.length === 1 ? "topic" : "topics";
+    const unit = documentsOnly ? "topics had documents" : "videos were";
 
     setStatus(
       `${scope} finished with errors`,
-      `${totalItems - failures.length} of ${totalItems} ${unit} saved. Refresh the affected page or click Resume playlist to retry.`,
+      `${totalTopics - failures.length} of ${totalTopics} ${unit} saved. Refresh the affected page or click Resume track to retry.`,
     );
 
-    playlistDownloadNote.textContent = `${failures.length} ${failedWord} failed; completed items were kept.`;
+    trackDownloadNote.textContent = `${failures.length} ${failedWord} failed; completed topics were kept.`;
 
     return;
   }
 
-  const completedDetails = completedPlaylistDetails(
-    totalItems,
-    itemWord,
+  const completedDetails = completedTrackDetails(
+    totalTopics,
+    topicWord,
     mode,
     runStats,
   );
@@ -3934,68 +3919,66 @@ function finalizePlaylistQueueStatus(
   setStatus(`${scope} finished`, completedDetails);
 
   if (runStats.skippedExisting > 0 && runStats.downloaded === 0) {
-    playlistDownloadNote.textContent = `${totalItems} ${itemWord} already downloaded (skipped).`;
+    trackDownloadNote.textContent = `${totalTopics} ${topicWord} already downloaded (skipped).`;
 
     return;
   }
 
   if (runStats.skippedExisting > 0) {
-    playlistDownloadNote.textContent = `${runStats.downloaded} saved · ${runStats.skippedExisting} skipped (already present).`;
+    trackDownloadNote.textContent = `${runStats.downloaded} saved · ${runStats.skippedExisting} skipped (already present).`;
 
     return;
   }
 
-  playlistDownloadNote.textContent = `${totalItems} ${itemWord} saved.`;
+  trackDownloadNote.textContent = `${totalTopics} ${topicWord} saved.`;
 }
 
-function emptyPlaylistErrorMessage(mode: PlaylistDownloadMode): string {
+function emptyTrackErrorMessage(mode: TrackDownloadMode): string {
   if (mode === "documents") {
-    return "This playlist scan did not find any downloadable companion documents.";
+    return "This track scan did not find any downloadable companion documents.";
   }
 
   if (mode === "videos") {
-    return "This playlist scan did not find any downloadable videos.";
+    return "This track scan did not find any downloadable videos.";
   }
 
-  return "This playlist scan did not find any downloadable videos, subtitles, or companion documents.";
+  return "This track scan did not find any downloadable videos, subtitles, or companion documents.";
 }
 
-async function processPlaylistQueueItem(
-  context: PlaylistQueueItemContext,
+async function processTrackQueueTopic(
+  context: TrackQueueTopicContext,
 ): Promise<boolean> {
   const {
     index,
     item,
-    totalItems,
+    totalTopics,
     initialPlan,
     queueState,
     runStats,
     failures,
   } = context;
 
-  if (isItemAlreadyCompleted(item, appState.playlistCompletedIndices)) {
+  if (isTopicAlreadyCompleted(item, appState.trackCompletedIndices)) {
     return true;
   }
 
-  const activePlan = appState.activePlaylistDownload ?? initialPlan;
+  const activePlan = appState.activeTrackDownload ?? initialPlan;
 
-  const activeMode = playlistDownloadModeOrDefault(
-    activePlan.playlistDownloadMode,
-  );
+  const activeMode = trackDownloadModeOrDefault(activePlan.trackDownloadMode);
 
-  playlistDownloadNote.textContent =
+  trackDownloadNote.textContent =
     activeMode === "documents"
-      ? `Playlist documents ${index + 1} of ${totalItems}: ${item.title}`
-      : `Playlist download ${index + 1} of ${totalItems}: ${item.title}`;
+      ? `Track documents ${index + 1} of ${totalTopics}: ${item.title}`
+      : `Track download ${index + 1} of ${totalTopics}: ${item.title}`;
 
-  const attempt = await runSinglePlaylistItem(
+  const attempt = await runSingleTrackTopic(
     item,
     activePlan,
-    appState.playlistDownloadedDocumentsByKey,
+    appState.trackDownloadedDocumentsByKey,
   );
 
   if (attempt.status === "cancelled") {
-    appState.playlistDownloadCancelled = true;
+    appState.trackDownloadCancelled = true;
 
     return false;
   }
@@ -4014,52 +3997,52 @@ async function processPlaylistQueueItem(
     return true;
   }
 
-  failures.push(item.title || `Item ${index + 1}`);
+  failures.push(item.title || `Topic ${index + 1}`);
 
-  return !shouldHaltPlaylistQueue(attempt.kind, queueState);
+  return !shouldHaltTrackQueue(attempt.kind, queueState);
 }
 
 /** Downloads the selected playlist items in their displayed order. */
-async function runPlaylistDownloads(
-  playlistDownload: PlaylistDownloadPlan,
+async function runTrackDownloads(
+  trackDownload: TrackDownloadPlan,
 ): Promise<void> {
-  const initialPlan = appState.activePlaylistDownload ?? playlistDownload;
-  const mode = playlistDownloadModeOrDefault(initialPlan.playlistDownloadMode);
+  const initialPlan = appState.activeTrackDownload ?? trackDownload;
+  const mode = trackDownloadModeOrDefault(initialPlan.trackDownloadMode);
   const items = initialPlan.items || [];
 
   if (!items.length) {
-    throw new Error(emptyPlaylistErrorMessage(mode));
+    throw new Error(emptyTrackErrorMessage(mode));
   }
 
-  appState.activePlaylistDownload = initialPlan;
-  appState.playlistRunActive = true;
-  appState.playlistDownloadCancelled = false;
+  appState.activeTrackDownload = initialPlan;
+  appState.trackRunActive = true;
+  appState.trackDownloadCancelled = false;
 
-  for (const idx of initialPlan.completedItemIndices || []) {
-    appState.playlistCompletedIndices.add(idx);
+  for (const idx of initialPlan.completedTopicIndices || []) {
+    appState.trackCompletedIndices.add(idx);
   }
 
   updateDownloadButtonLabel();
-  playlistDownloadNote.hidden = false;
+  trackDownloadNote.hidden = false;
   const failures: string[] = [];
   const runStats = { downloaded: 0, skippedExisting: 0 };
 
-  const queueState: PlaylistQueueState = {
+  const queueState: TrackQueueState = {
     consecutiveAuthFailures: 0,
     haltedKind: null,
   };
 
-  appState.playlistExistingDownloads = await loadExistingDownloadsIndex();
+  appState.trackExistingDownloads = await loadExistingDownloadsIndex();
 
   try {
     await withDownloadTabKeepAlive(async () => {
       for (const [index, item] of items.entries()) {
-        if (appState.playlistDownloadCancelled) break;
+        if (appState.trackDownloadCancelled) break;
 
-        const shouldContinue = await processPlaylistQueueItem({
+        const shouldContinue = await processTrackQueueTopic({
           index,
           item,
-          totalItems: items.length,
+          totalTopics: items.length,
           initialPlan,
           queueState,
           runStats,
@@ -4070,21 +4053,21 @@ async function runPlaylistDownloads(
       }
     });
   } finally {
-    appState.playlistRunActive = false;
-    appState.playlistFolderSegments = [];
-    appState.playlistExistingDownloads = null;
+    appState.trackRunActive = false;
+    appState.trackFolderSegments = [];
+    appState.trackExistingDownloads = null;
 
     const allCompleted =
-      !appState.playlistDownloadCancelled &&
+      !appState.trackDownloadCancelled &&
       !queueState.haltedKind &&
       !failures.length &&
-      !hasResumablePlaylistPlan();
+      !hasResumableTrackPlan();
 
-    if (allCompleted) appState.activePlaylistDownload = null;
+    if (allCompleted) appState.activeTrackDownload = null;
     setBusy(false);
   }
 
-  finalizePlaylistQueueStatus(
+  finalizeTrackQueueStatus(
     items.length,
     failures,
     queueState.haltedKind,
@@ -4099,14 +4082,14 @@ analyzeButton.addEventListener("click", () => {
 
 downloadButton.addEventListener("click", () => {
   if (
-    hasResumablePlaylistPlan() &&
-    appState.activePlaylistDownload &&
-    !appState.playlistRunActive
+    hasResumableTrackPlan() &&
+    appState.activeTrackDownload &&
+    !appState.trackRunActive
   ) {
-    syncPlaylistPreferencesFromControls();
+    syncTrackPreferencesFromControls();
 
-    runPlaylistDownloads(appState.activePlaylistDownload).catch((error) =>
-      setFailure("Playlist download failed", error),
+    runTrackDownloads(appState.activeTrackDownload).catch((error) =>
+      setFailure("Track download failed", error),
     );
 
     return;
@@ -4116,7 +4099,7 @@ downloadButton.addEventListener("click", () => {
 });
 
 cancelButton.addEventListener("click", () => {
-  appState.playlistDownloadCancelled = true;
+  appState.trackDownloadCancelled = true;
   appState.controller?.abort();
 });
 
@@ -4134,8 +4117,8 @@ copyPlaylistButton.addEventListener("click", () => {
 
 playlistUrl.addEventListener("input", () => {
   appState.playlistAnalysis = null;
-  appState.activePlaylistDownload = null;
-  appState.playlistCompletedIndices = new Set<number>();
+  appState.activeTrackDownload = null;
+  appState.trackCompletedIndices = new Set<number>();
   appState.userSelectedQualityForUrl = "";
   qualitySelect.disabled = true;
   qualitySelect.replaceChildren(new Option("Analyze the manifest first"));
@@ -4145,7 +4128,7 @@ playlistUrl.addEventListener("input", () => {
 
 concurrency.addEventListener("change", () => {
   chrome.storage.local.set({ segmentConcurrency: Number(concurrency.value) });
-  syncPlaylistPreferencesFromControls();
+  syncTrackPreferencesFromControls();
 });
 
 container.addEventListener("change", () => {
@@ -4160,7 +4143,7 @@ container.addEventListener("change", () => {
     subtitleNote.textContent = `${appState.selectedSubtitleTrack.language} is ${nextFormat === "mkv" ? "embedded in the MKV" : "saved as a matching VTT file"}.`;
   }
 
-  syncPlaylistPreferencesFromControls();
+  syncTrackPreferencesFromControls();
 });
 
 qualitySelect.addEventListener("change", () => {
@@ -4171,7 +4154,7 @@ qualitySelect.addEventListener("change", () => {
     appState.selectedQualityPlaylistUrl = selected.uri;
     appState.userSelectedQualityForUrl = playlistUrl.value.trim();
     chrome.storage.local.set({ preferredQualityLabel: selected.label });
-    syncPlaylistPreferencesFromControls();
+    syncTrackPreferencesFromControls();
   }
 });
 
@@ -4209,7 +4192,7 @@ const downloadRequestId = new URLSearchParams(location.search).get(
   "download-request",
 );
 
-const playlistDownloadId = new URLSearchParams(location.search).get("playlist");
+const trackDownloadId = new URLSearchParams(location.search).get("track");
 
 if (downloadRequestId) {
   chrome.runtime
@@ -4273,48 +4256,40 @@ if (downloadRequestId) {
     );
 }
 
-if (playlistDownloadId) {
+if (trackDownloadId) {
   chrome.runtime
-    .sendMessage({ type: "take-playlist-download", playlistDownloadId })
-    .then(
-      async ({
-        playlistDownload,
-      }: {
-        playlistDownload?: PlaylistDownloadPlan;
-      }) => {
-        if (!playlistDownload?.items?.length) {
-          setStatus(
-            "Playlist download unavailable",
-            "Start a new playlist scan from the playlist page.",
-          );
-
-          return;
-        }
-
-        await Promise.all([preferencesReady, downloadSubfolderReady]);
-
-        appState.activePlaylistDownload = playlistDownload;
-
-        appState.playlistCompletedIndices = new Set(
-          playlistDownload.completedItemIndices || [],
+    .sendMessage({ type: "take-track-download", trackDownloadId })
+    .then(async ({ trackDownload }: { trackDownload?: TrackDownloadPlan }) => {
+      if (!trackDownload?.items?.length) {
+        setStatus(
+          "Track download unavailable",
+          "Start a new track scan from the track page.",
         );
 
-        appState.playlistDownloadedDocumentsByKey = new Map();
+        return;
+      }
 
-        const mode = playlistDownloadModeOrDefault(
-          playlistDownload.playlistDownloadMode,
-        );
+      await Promise.all([preferencesReady, downloadSubfolderReady]);
 
-        videoTitle.textContent = playlistDownload.title || "Playlist playlist";
-        playlistDownloadNote.hidden = false;
+      appState.activeTrackDownload = trackDownload;
 
-        playlistDownloadNote.textContent =
-          mode === "documents"
-            ? `${playlistDownload.items.length} items queued for documents download. Folder names follow the playlist outline.`
-            : `${playlistDownload.items.length} video items are queued. Folder names follow the playlist outline.`;
+      appState.trackCompletedIndices = new Set(
+        trackDownload.completedTopicIndices || [],
+      );
 
-        await runPlaylistDownloads(playlistDownload);
-      },
-    )
-    .catch((error) => setFailure("Playlist download unavailable", error));
+      appState.trackDownloadedDocumentsByKey = new Map();
+
+      const mode = trackDownloadModeOrDefault(trackDownload.trackDownloadMode);
+
+      videoTitle.textContent = trackDownload.title || "Track";
+      trackDownloadNote.hidden = false;
+
+      trackDownloadNote.textContent =
+        mode === "documents"
+          ? `${trackDownload.items.length} topics queued for documents download. Folder names follow the track outline.`
+          : `${trackDownload.items.length} video topics are queued. Folder names follow the track outline.`;
+
+      await runTrackDownloads(trackDownload);
+    })
+    .catch((error) => setFailure("Track download unavailable", error));
 }

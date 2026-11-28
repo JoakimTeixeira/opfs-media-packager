@@ -81,19 +81,19 @@ test("should repair double-encoded Portuguese VTT subtitles (preserving CRLF) an
       expect(repairedVtt).not.toContain("Ã§");
       expect(repairedVtt).toContain("\r\n");
 
-      // 2. Verify playlist.html default "all" -> "documents" mode, headless Excalidraw, URL dedup, and annotated Markdown across 2 lessons.
+      // 2. Verify track.html default "all" -> "documents" mode, headless Excalidraw, URL dedup, and annotated Markdown across 2 lessons.
       const scanId = "e2e-materials-scan";
 
       await setupPage.evaluate(
         async ({ diagramUrl, id, origin }) => {
           await chrome.storage.session.set({
-            [`playlist-scan:${id}`]: {
+            [`track-scan:${id}`]: {
               id,
               title: "Workshop Materials",
               status: "ready",
               rateLimited: false,
-              nextItemIndex: 2,
-              currentItemIndex: null,
+              nextTopicIndex: 2,
+              currentTopicIndex: null,
               sourceTabId: null,
               startedAt: Date.now(),
               items: [
@@ -123,7 +123,7 @@ test("should repair double-encoded Portuguese VTT subtitles (preserving CRLF) an
                   subtitles: [],
                   detectedAt: Date.now(),
                   folderPath: ["1. Dia 1"],
-                  itemIndex: 0,
+                  topicIndex: 0,
                   documents: {
                     markdown: [
                       "# 1.1 Arquitetura Completa",
@@ -188,7 +188,7 @@ test("should repair double-encoded Portuguese VTT subtitles (preserving CRLF) an
                   subtitles: [],
                   detectedAt: Date.now(),
                   folderPath: ["2. Dia 2"],
-                  itemIndex: 1,
+                  topicIndex: 1,
                   documents: {
                     markdown: [
                       "# 1.2 Revisao e Links",

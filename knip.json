@@ -2,8 +2,8 @@
   "$schema": "https://unpkg.com/knip@5/schema.json",
   "entry": [
     "src/background.ts",
-    "src/playlist.ts",
-    "src/page-playlist-probe.ts",
+    "src/track.ts",
+    "src/page-track-probe.ts",
     "src/popup.ts",
     "scripts/*.ts",
     "tests/**/*.ts",

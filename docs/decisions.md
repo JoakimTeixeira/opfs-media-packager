@@ -22,15 +22,15 @@ Each entry states the problem, the chosen approach, and the observable result. T
 
 **Decision:** Scan from the signed-in page first. Use a hidden same-site frame when a page needs browser rendering. The page request path spaces requests by at least 550 milliseconds and makes one retry after HTTP 429 or 503. It uses a bounded `Retry-After` delay and stops that scan after a second consecutive response.
 
-**Result:** Playlist scanning stays in the background and gives the host time to recover. HTTP 429 means “too many requests”. HTTP 503 means the service is temporarily unavailable.
+**Result:** Track scanning stays in the background and gives the host time to recover. HTTP 429 means “too many requests”. HTTP 503 means the service is temporarily unavailable.
 
 **Architecture technique:** Layered fallback with resilience controls. Each scan layer has a narrower browser capability than the next layer. The rate limiter, retry delay, and circuit breaker stop repeated calls after the host signals overload.
 
 **Alternatives and trade-off:** Visible tabs provide a full page environment but can interrupt the user. Page requests are quieter but may miss content created only after rendering. Hidden frames and a minimized window provide fallback paths and add coordination complexity.
 
-**Evidence and review trigger:** The playlist scanner in `src/` and the scan tests in [`tests/integration/`](../tests/integration/) cover pacing and repeated responses. Revisit the approach when a supported page requires a different execution environment or the host changes its request policy.
+**Evidence and review trigger:** The track scanner in `src/` and the scan tests in [`tests/integration/`](../tests/integration/) cover pacing and repeated responses. Revisit the approach when a supported page requires a different execution environment or the host changes its request policy.
 
-**Concrete example:** Two consecutive HTTP 429 responses stop the current scan. The [playlist scan sequence](decision-examples/playlist-scan-pacing.md) shows both requests and responses.
+**Concrete example:** Two consecutive HTTP 429 responses stop the current scan. The [track scan sequence](decision-examples/track-scan-pacing.md) shows both requests and responses.
 
 ## Separate item results from failure categories
 
@@ -38,7 +38,7 @@ Each entry states the problem, the chosen approach, and the observable result. T
 
 **Decision:** An item reports one outcome: `completed`, `cancelled`, or `failed`. A failed item has a category: `item`, `unauthorized`, `rate-limited`, or `engine`.
 
-The download coordinator decides whether the playlist queue continues. The playlist scanner has a separate retry policy while finding items. An item failure affects one item, so the queue records it and continues. A classified rate-limit or engine failure pauses the queue. Two access failures in a row pause the queue because HTTP 401 and 403 indicate that the media request was refused.
+The download coordinator decides whether the track queue continues. The track scanner has a separate retry policy while finding items. An item failure affects one item, so the queue records it and continues. A classified rate-limit or engine failure pauses the queue. Two access failures in a row pause the queue because HTTP 401 and 403 indicate that the media request was refused.
 
 **Result:** Cancelling keeps the exact unfinished item and resume state. One broken item does not block unrelated items. Session-wide access and rate-limit failures stop further requests before they repeat across the playlist.
 
@@ -75,7 +75,7 @@ if (attempt.status === "cancelled") return "stop";
 if (attempt.status === "completed") markCompleted(item);
 ```
 
-The second example is illustrative and omits failure classification. See the [queue outcome example](decision-examples/playlist-queue-outcomes.md). The real queue policy also pauses after repeated access denial. The [download flow diagram](download-and-resume.md) shows how interrupted work relates to saved video parts.
+The second example is illustrative and omits failure classification. See the [queue outcome example](decision-examples/track-queue-outcomes.md). The real queue policy also pauses after repeated access denial. The [download flow diagram](download-and-resume.md) shows how interrupted work relates to saved video parts.
 
 ## Store large downloads on disk while they run
 
@@ -93,7 +93,7 @@ The second example is illustrative and omits failure classification. See the [qu
 
 **Concrete example:** A resumed download validates saved parts before deciding what to fetch. See the [checkpoint flow](decision-examples/large-downloads-and-checkpoints.md).
 
-## Keep preferences consistent for a playlist download
+## Keep preferences consistent for a track download
 
 **Problem:** A retry could use older quality, format, or concurrency choices. Cancelling a playlist could lose the remaining items.
 
@@ -105,7 +105,7 @@ The second example is illustrative and omits failure classification. See the [qu
 
 **Trade-off and evidence:** Chrome session storage is available to extension contexts for the browser session. It is not a permanent backup across all browser restarts or storage clearing. The browser tests in [`tests/e2e/`](../tests/e2e/) cover updated preferences and playlist resume. Revisit persistence requirements if users need recovery after a full browser restart.
 
-**Concrete example:** Retrying a playlist reads the saved output format. See the [preference comparison](decision-examples/playlist-download-preferences.md).
+**Concrete example:** Retrying a playlist reads the saved output format. See the [preference comparison](decision-examples/track-download-preferences.md).
 
 ## Select adapters from page structure
 
@@ -124,17 +124,17 @@ The second example is illustrative and omits failure classification. See the [qu
 **Example: select a reader from the page route.** This example runs from the project root with Node.js and uses fictional URLs. A supported route selects the same reader on different hosts. An unrelated route returns `null`.
 
 ```ts
-import { playlistAdapterId } from "./lib/playlist/playlist-adapters.ts";
+import { trackAdapterId } from "./lib/track/track-adapters.ts";
 
-playlistAdapterId("https://media.example/c/topic/sections/1/lessons/2");
-// "sidebar-playlist"
-playlistAdapterId("https://learning.example/c/topic/sections/1/lessons/2");
-// "sidebar-playlist"
-playlistAdapterId("https://media.example/about");
+trackAdapterId("https://media.example/c/topic/sections/1/lessons/2");
+// "sidebar-track"
+trackAdapterId("https://learning.example/c/topic/sections/1/lessons/2");
+// "sidebar-track"
+trackAdapterId("https://media.example/about");
 // null
 ```
 
-Route selection only chooses the reader. The page still needs compatible content for playlist detection to succeed. See the [host-based comparison](decision-examples/playlist-page-adapters.md).
+Route selection only chooses the reader. The page still needs compatible content for playlist detection to succeed. See the [host-based comparison](decision-examples/track-page-adapters.md).
 
 ## Keep credentials inside Chrome
 
@@ -154,13 +154,13 @@ Route selection only chooses the reader. The page still needs compatible content
 
 ## Extension rules for maintainers
 
-| Change                                | Required place to extend                                                                     | Minimum evidence                                                                              |
-| ------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Support a new playlist page structure | Add a route or structure adapter and keep provider names out of the code.                    | Adapter unit test, realistic probe integration test, and popup flow test when the UI changes. |
-| Add page-supplied data                | Add a named type and validate it at the content or background message boundary.              | Invalid input tests plus a trusted-input flow test.                                           |
-| Add a queue failure class             | Extend the typed failure union, central policy, user message, and resume behaviour together. | Tests for the failure classification, queue action, cancellation, and retry state.            |
-| Add persisted download state          | Define the immutable stored shape and a validator before reusing it.                         | Corrupt, stale, complete, and interrupted-state tests.                                        |
-| Add a user preference                 | Define one default in the preference module and read it through the shared preference API.   | Default, migration, popup, playlist, and downloader tests when each screen exposes it.        |
+| Change                             | Required place to extend                                                                     | Minimum evidence                                                                              |
+| ---------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Support a new track page structure | Add a route or structure adapter and keep provider names out of the code.                    | Adapter unit test, realistic probe integration test, and popup flow test when the UI changes. |
+| Add page-supplied data             | Add a named type and validate it at the content or background message boundary.              | Invalid input tests plus a trusted-input flow test.                                           |
+| Add a queue failure class          | Extend the typed failure union, central policy, user message, and resume behaviour together. | Tests for the failure classification, queue action, cancellation, and retry state.            |
+| Add persisted download state       | Define the immutable stored shape and a validator before reusing it.                         | Corrupt, stale, complete, and interrupted-state tests.                                        |
+| Add a user preference              | Define one default in the preference module and read it through the shared preference API.   | Default, migration, popup, playlist, and downloader tests when each screen exposes it.        |
 
 These rules prevent a behaviour change from requiring scattered edits. They make the module that owns the domain concept the single place that defines its value and policy.
 
