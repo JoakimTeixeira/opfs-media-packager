@@ -50,10 +50,17 @@ function availableQualityOptions(
       if (!record) return [];
       const url = safeMediaUrl(record.url);
       const label = boundedText(record.label, 80).trim();
+      const audioUri = safeMediaUrl(record.audioUri);
 
       if (!url || !/^\d{3,4}p(?:\s|\(|$)/i.test(label)) return [];
 
-      return [Object.freeze({ url, label })];
+      return [
+        Object.freeze({
+          url,
+          label,
+          ...(audioUri ? { audioUri } : {}),
+        }),
+      ];
     }),
   );
 }

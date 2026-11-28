@@ -126,3 +126,31 @@ test("should reject malformed quoted attributes and stream tags without a follow
     ["1080p (1920×1080)", "720p (1280×720)", "480p (854×480)"],
   );
 });
+
+test("should attach matching EXT-X-MEDIA audio group URIs to quality options", () => {
+  const master = parseHlsMaster(
+    [
+      "#EXTM3U",
+      '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio-high",NAME="Alt",URI="audio/alt.m3u8"',
+      '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio-high",NAME="Main",DEFAULT=YES,AUTOSELECT=YES,URI="audio/main.m3u8"',
+      '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio-high",NAME="Low",AUTOSELECT=YES,URI="audio/low.m3u8"',
+      '#EXT-X-STREAM-INF:BANDWIDTH=4500000,RESOLUTION=1920x1080,AUDIO="audio-high"',
+      "video/1080p.m3u8",
+      '#EXT-X-STREAM-INF:BANDWIDTH=1200000,RESOLUTION=1280x720,AUDIO="missing-group"',
+      "video/720p.m3u8",
+    ].join("\n"),
+    "https://cdn.example/sep/master.m3u8",
+  );
+
+  assert.deepEqual(master.qualityOptions, [
+    {
+      url: "https://cdn.example/sep/video/1080p.m3u8",
+      label: "1080p (1920×1080)",
+      audioUri: "https://cdn.example/sep/audio/main.m3u8",
+    },
+    {
+      url: "https://cdn.example/sep/video/720p.m3u8",
+      label: "720p (1280×720)",
+    },
+  ]);
+});

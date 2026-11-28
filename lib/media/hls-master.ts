@@ -1,6 +1,7 @@
 export interface VideoQualityOption {
   readonly url: string;
   readonly label: string;
+  readonly audioUri?: string;
 }
 
 export interface RawSubtitleTrack {
@@ -13,6 +14,11 @@ export interface HlsMasterMetadata {
   readonly isMaster: boolean;
   readonly qualityOptions: readonly VideoQualityOption[];
   readonly subtitles: readonly RawSubtitleTrack[];
+}
+
+interface AudioGroupCandidate {
+  readonly uri: string;
+  readonly score: number;
 }
 
 export function parseHlsAttributes(source: string): Record<string, string> {
@@ -44,10 +50,51 @@ export function sortHlsQualityOptions<T extends { readonly label: string }>(
   );
 }
 
+/**
+ * Collects the preferred audio rendition URI per `#EXT-X-MEDIA:TYPE=AUDIO`
+ * `GROUP-ID`, preferring `DEFAULT=YES`, then `AUTOSELECT=YES`, then highest
+ * listed entry.
+ */
+export function parseHlsAudioGroups(
+  lines: readonly string[],
+  baseUrl: string,
+): ReadonlyMap<string, string> {
+  const bestByGroup = new Map<string, AudioGroupCandidate>();
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+
+    if (!line.startsWith("#EXT-X-MEDIA:")) continue;
+
+    const attrs = parseHlsAttributes(line.slice(13));
+
+    if (attrs.TYPE !== "AUDIO" || !attrs.URI || !attrs["GROUP-ID"]) continue;
+
+    const groupId = attrs["GROUP-ID"];
+    const uri = new URL(attrs.URI, baseUrl).href;
+
+    const score =
+      (attrs.DEFAULT === "YES" ? 4 : 0) +
+      (attrs.AUTOSELECT === "YES" ? 2 : 0) +
+      1;
+
+    const current = bestByGroup.get(groupId);
+
+    if (!current || score > current.score) {
+      bestByGroup.set(groupId, { uri, score });
+    }
+  }
+
+  return new Map(
+    [...bestByGroup.entries()].map(([groupId, entry]) => [groupId, entry.uri]),
+  );
+}
+
 function parseStreamInfEntry(
   lines: readonly string[],
   index: number,
   baseUrl: string,
+  audioGroups: ReadonlyMap<string, string>,
 ): VideoQualityOption | null {
   const attrs = parseHlsAttributes(lines[index].slice(18));
 
@@ -57,12 +104,14 @@ function parseStreamInfEntry(
 
   if (!uri) return null;
   const [width, height] = (attrs.RESOLUTION || "0x0").split("x").map(Number);
+  const audioUri = attrs.AUDIO ? audioGroups.get(attrs.AUDIO) : undefined;
 
   return {
     url: new URL(uri, baseUrl).href,
     label: height
       ? `${height}p (${width}×${height})`
       : `${Math.round(Number(attrs.BANDWIDTH || 0) / 1000)} kbps`,
+    ...(audioUri ? { audioUri } : {}),
   };
 }
 
@@ -96,12 +145,13 @@ export function parseHlsMaster(
     .split(/\r?\n/)
     .map((line) => line.trim());
 
+  const audioGroups = parseHlsAudioGroups(lines, baseUrl);
   const qualityOptions: VideoQualityOption[] = [];
   const subtitles: RawSubtitleTrack[] = [];
 
   for (const [index, line] of lines.entries()) {
     if (line.startsWith("#EXT-X-STREAM-INF:")) {
-      const option = parseStreamInfEntry(lines, index, baseUrl);
+      const option = parseStreamInfEntry(lines, index, baseUrl, audioGroups);
 
       if (
         option &&

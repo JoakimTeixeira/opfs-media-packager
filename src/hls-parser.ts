@@ -1,5 +1,6 @@
 import {
   parseHlsAttributes,
+  parseHlsAudioGroups,
   qualityOptionKey,
   sortHlsQualityOptions,
 } from "../lib/media/hls-master.ts";
@@ -27,6 +28,7 @@ export interface AnalyzedQualityOption {
   readonly label: string;
   readonly bandwidth: number;
   readonly codecs: string;
+  readonly audioUri?: string;
 }
 
 export interface MasterPlaylistAnalysis {
@@ -90,6 +92,7 @@ function parseMasterQualityOptions(
   lines: readonly string[],
   baseUrl: string,
 ): AnalyzedQualityOption[] {
+  const audioGroups = parseHlsAudioGroups(lines, baseUrl);
   const qualityOptions: AnalyzedQualityOption[] = [];
 
   for (const [index, rawLine] of lines.entries()) {
@@ -99,6 +102,7 @@ function parseMasterQualityOptions(
     const attrs = parseAttributes(line.slice("#EXT-X-STREAM-INF:".length));
     const next = nextUri(lines, index + 1);
     const [width, height] = (attrs.RESOLUTION || "0x0").split("x").map(Number);
+    const audioUri = attrs.AUDIO ? audioGroups.get(attrs.AUDIO) : undefined;
 
     const candidate: AnalyzedQualityOption = {
       uri: resolveUri(next.value, baseUrl),
@@ -107,6 +111,7 @@ function parseMasterQualityOptions(
         : `${Math.round(Number(attrs.BANDWIDTH || 0) / 1000)} kbps`,
       bandwidth: Number(attrs.BANDWIDTH || 0),
       codecs: attrs.CODECS || "unknown codec",
+      ...(audioUri ? { audioUri } : {}),
     };
 
     if (

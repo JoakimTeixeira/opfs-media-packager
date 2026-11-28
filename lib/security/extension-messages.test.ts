@@ -268,7 +268,16 @@ test("should validate the download request once at the privileged boundary", () 
     autoStart: true,
     subtitle: { url: "https://cdn.example/caption.vtt", language: "English" },
     qualityOptions: [
-      { url: "https://cdn.example/720p/video.m3u8", label: "720p" },
+      {
+        url: "https://cdn.example/720p/video.m3u8",
+        label: "720p",
+        audioUri: "https://cdn.example/audio/index.m3u8",
+      },
+      {
+        url: "https://cdn.example/480p/video.m3u8",
+        label: "480p",
+        audioUri: "http://127.0.0.1/audio.m3u8",
+      },
       { url: "https://cdn.example/invalid.m3u8", label: "Source playlist" },
     ],
   });
@@ -285,7 +294,12 @@ test("should validate the download request once at the privileged boundary", () 
   });
 
   assert.deepEqual(request?.qualityOptions, [
-    { url: "https://cdn.example/720p/video.m3u8", label: "720p" },
+    {
+      url: "https://cdn.example/720p/video.m3u8",
+      label: "720p",
+      audioUri: "https://cdn.example/audio/index.m3u8",
+    },
+    { url: "https://cdn.example/480p/video.m3u8", label: "480p" },
   ]);
 
   assert.equal(Object.isFrozen(request), true);
