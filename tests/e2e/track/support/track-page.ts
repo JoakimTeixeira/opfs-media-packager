@@ -4,6 +4,7 @@ import { extensionPath } from "../../support/extension.ts";
 
 export interface TrackOutlineTopic {
   readonly url: string;
+  readonly fileTitle?: string;
   readonly folderPath: readonly string[];
 }
 

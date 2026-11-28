@@ -61,6 +61,103 @@ export async function generateTinyTsSegment(
   return Buffer.from(segmentBase64, "base64");
 }
 
+export async function generateTinyFmp4Streams(page: Page): Promise<{
+  readonly videoInit: Buffer;
+  readonly videoSegment: Buffer;
+  readonly audioInit: Buffer;
+  readonly audioSegment: Buffer;
+}> {
+  const encoded = await page.evaluate(async () => {
+    const { FFmpeg } = (await import(
+      chrome.runtime.getURL("vendor/ffmpeg/classes.js")
+    )) as {
+      FFmpeg: new () => {
+        load(config: Record<string, string>): Promise<void>;
+        exec(args: string[]): Promise<number>;
+        readFile(path: string): Promise<Uint8Array>;
+        terminate(): void;
+      };
+    };
+
+    const ffmpeg = new FFmpeg();
+
+    await ffmpeg.load({
+      classWorkerURL: chrome.runtime.getURL("vendor/ffmpeg/worker.js"),
+      coreURL: chrome.runtime.getURL("vendor/ffmpeg/ffmpeg-core.js"),
+      wasmURL: chrome.runtime.getURL("vendor/ffmpeg/ffmpeg-core.wasm"),
+    });
+
+    const videoCode = await ffmpeg.exec([
+      "-f",
+      "lavfi",
+      "-i",
+      "color=c=black:s=32x32:d=0.1:r=10",
+      "-c:v",
+      "libx264",
+      "-pix_fmt",
+      "yuv420p",
+      "-movflags",
+      "+frag_keyframe+empty_moov+default_base_moof",
+      "video-fmp4.mp4",
+    ]);
+
+    if (videoCode !== 0) {
+      throw new Error(`FFmpeg video fMP4 fixture failed: ${videoCode}`);
+    }
+
+    const audioCode = await ffmpeg.exec([
+      "-f",
+      "lavfi",
+      "-i",
+      "sine=frequency=440:duration=0.1",
+      "-c:a",
+      "aac",
+      "-movflags",
+      "+frag_keyframe+empty_moov+default_base_moof",
+      "audio-fmp4.mp4",
+    ]);
+
+    if (audioCode !== 0) {
+      throw new Error(`FFmpeg audio fMP4 fixture failed: ${audioCode}`);
+    }
+
+    const splitInitAndMoof = (
+      bytes: Uint8Array,
+    ): { readonly init: string; readonly segment: string } => {
+      const moofIndex = bytes.findIndex(
+        (_byte, index) =>
+          index + 4 <= bytes.length &&
+          bytes[index] === 0x6d &&
+          bytes[index + 1] === 0x6f &&
+          bytes[index + 2] === 0x6f &&
+          bytes[index + 3] === 0x66,
+      );
+
+      const splitAt =
+        moofIndex >= 4 ? moofIndex - 4 : Math.floor(bytes.length / 2);
+
+      return {
+        init: btoa(String.fromCharCode(...bytes.subarray(0, splitAt))),
+        segment: btoa(String.fromCharCode(...bytes.subarray(splitAt))),
+      };
+    };
+
+    const video = splitInitAndMoof(await ffmpeg.readFile("video-fmp4.mp4"));
+    const audio = splitInitAndMoof(await ffmpeg.readFile("audio-fmp4.mp4"));
+
+    ffmpeg.terminate();
+
+    return { video, audio };
+  });
+
+  return {
+    videoInit: Buffer.from(encoded.video.init, "base64"),
+    videoSegment: Buffer.from(encoded.video.segment, "base64"),
+    audioInit: Buffer.from(encoded.audio.init, "base64"),
+    audioSegment: Buffer.from(encoded.audio.segment, "base64"),
+  };
+}
+
 export async function runMaterialsOnlyCourseFromCoursePage(
   context: Page["context"] extends () => infer C ? C : never,
   extensionId: string,

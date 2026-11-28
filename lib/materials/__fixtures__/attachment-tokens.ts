@@ -6,7 +6,7 @@ const DEFAULT_OPAQUE_TOKEN_LENGTH = 28;
  * opaque CDN blob keys (28 base-36 characters) without embedding real tokens
  * or filename extension hints in test URLs.
  */
-function syntheticOpaqueToken(
+export function syntheticOpaqueToken(
   seed: string,
   length = DEFAULT_OPAQUE_TOKEN_LENGTH,
 ): string {
